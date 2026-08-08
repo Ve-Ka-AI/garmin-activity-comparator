@@ -1275,11 +1275,11 @@
 
             if (isDef) {
               if (idx + 5 > bodyEnd) break;
-              const arch = data[idx + 1];
-              idx += 1;
+              const reserved = data[idx++];
+              const arch = data[idx++];
               const isLittle = (arch === 0);
-              const gNum = view.getUint16(idx + 1, isLittle);
-              idx += 4;
+              const gNum = view.getUint16(idx, isLittle);
+              idx += 2;
               const numFields = data[idx++];
               const fields = [];
               for (let f = 0; f < numFields; f++) {
