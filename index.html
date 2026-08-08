@@ -564,7 +564,7 @@
       height: calc(100vh - 80px) !important;
     }
 
-    /* Multi-Chart Grid (6 charts) */
+    /* Multi-Chart Grid (4 charts) */
     .charts-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -873,7 +873,7 @@
 
       </div>
 
-      <!-- Main Panel: Map, 6 Charts Grid & Comparison Matrix -->
+      <!-- Main Panel: Map, 4 Charts Grid & Comparison Matrix -->
       <div class="dashboard-main">
 
         <!-- Leaflet Map Card -->
@@ -888,7 +888,7 @@
           <div id="map"></div>
         </div>
 
-        <!-- Charts Grid (6 synchronized charts) -->
+        <!-- Charts Grid (4 synchronized charts) -->
         <div class="charts-grid">
           
           <!-- Chart 1: Altitude -->
@@ -918,28 +918,10 @@
             <div class="chart-wrapper"><canvas id="chartHR"></canvas></div>
           </div>
 
-          <!-- Chart 4: GPS Signal Accuracy -->
-          <div class="chart-card card-fullscreen-target" id="cardChartGPS">
-            <div class="chart-header-row">
-              <div class="chart-title" id="titleGPSChart"><span style="color: #60a5fa;">●</span> 4. Přesnost & Kvalita GPS Signálu (ePE v m)</div>
-              <button class="btn-fullscreen" onclick="toggleFullscreen('cardChartGPS')">⛶ Celá obrazovka</button>
-            </div>
-            <div class="chart-wrapper"><canvas id="chartGPS"></canvas></div>
-          </div>
-
-          <!-- Chart 5: Battery Level Drop -->
-          <div class="chart-card card-fullscreen-target" id="cardChartBattery">
-            <div class="chart-header-row">
-              <div class="chart-title" id="titleBatteryChart"><span style="color: #fbbf24;">●</span> 5. Průběh Vybíjení Baterie (%)</div>
-              <button class="btn-fullscreen" onclick="toggleFullscreen('cardChartBattery')">⛶ Celá obrazovka</button>
-            </div>
-            <div class="chart-wrapper"><canvas id="chartBattery"></canvas></div>
-          </div>
-
-          <!-- Chart 6: Ambient Temperature -->
+          <!-- Chart 4: Ambient Temperature -->
           <div class="chart-card card-fullscreen-target" id="cardChartTemp">
             <div class="chart-header-row">
-              <div class="chart-title" id="titleTempChart"><span style="color: #2dd4bf;">●</span> 6. Teplota Okolí (°C)</div>
+              <div class="chart-title" id="titleTempChart"><span style="color: #2dd4bf;">●</span> 4. Teplota Okolí (°C)</div>
               <button class="btn-fullscreen" onclick="toggleFullscreen('cardChartTemp')">⛶ Celá obrazovka</button>
             </div>
             <div class="chart-wrapper"><canvas id="chartTemp"></canvas></div>
@@ -1008,9 +990,7 @@
         titleAltChart: "1. Nadmořská výška (m)",
         titleSpeedChart: "2. Rychlost / Tempo",
         titleHRChart: "3. Srdeční tep",
-        titleGPSChart: "4. Přesnost & Kvalita GPS Signálu (ePE v m)",
-        titleBatteryChart: "5. Průběh Vybíjení Baterie (%)",
-        titleTempChart: "6. Teplota Okolí (°C)",
+        titleTempChart: "4. Teplota Okolí (°C)",
         matrixTitle: "Srovnávací matice aktivit",
         btnExportText: "Export do Excelu (.xlsx)",
         statusProcessing: "Zpracovávám soubory ({progress}/{total})...",
@@ -1066,9 +1046,7 @@
         titleAltChart: "1. Elevation Profile (m)",
         titleSpeedChart: "2. Speed / Pace",
         titleHRChart: "3. Heart Rate",
-        titleGPSChart: "4. GPS Signal Accuracy (ePE in m)",
-        titleBatteryChart: "5. Battery Discharge Rate (%)",
-        titleTempChart: "6. Ambient Temperature (°C)",
+        titleTempChart: "4. Ambient Temperature (°C)",
         matrixTitle: "Activity Comparison Matrix",
         btnExportText: "Export to Excel (.xlsx)",
         statusProcessing: "Processing files ({progress}/{total})...",
@@ -1114,7 +1092,7 @@
 
     const TRACK_COLORS = ['#38bdf8', '#c084fc', '#34d399', '#fbbf24', '#f43f5e'];
 
-    // Map & 6 Charts references
+    // Map & 4 Active Charts references
     let map = null;
     let mapPolylineGroup = null;
     let mapMarkerGroup = null;
@@ -1123,8 +1101,6 @@
     let chartAlt = null;
     let chartSpeed = null;
     let chartHR = null;
-    let chartGPS = null;
-    let chartBattery = null;
     let chartTemp = null;
 
     // --- Garmin Product ID Mapping ---
@@ -1152,7 +1128,7 @@
 
       setTimeout(() => {
         if (map) map.invalidateSize();
-        [chartAlt, chartSpeed, chartHR, chartGPS, chartBattery, chartTemp].forEach(c => {
+        [chartAlt, chartSpeed, chartHR, chartTemp].forEach(c => {
           if (c) c.resize();
         });
       }, 100);
@@ -1248,7 +1224,7 @@
       return `${m}:${s < 10 ? '0' : ''}${s}`;
     }
 
-    // --- Robust Dual FIT Parser with Endianness & Enhanced Fields ---
+    // --- Spec-Compliant Dual FIT Parser with Endianness, Session & Enhanced Fields ---
     function parseFitNative(arrayBuffer, filePathName) {
       try {
         const data = new Uint8Array(arrayBuffer);
@@ -1261,6 +1237,7 @@
         const defs = {};
         const records = [];
         const deviceInfos = [];
+        let sessionData = null;
         let fileId = {};
 
         let idx = headerSize;
@@ -1268,10 +1245,48 @@
           const hdr = data[idx++];
           const isCompressed = (hdr & 0x80) !== 0;
 
-          if (!isCompressed) {
-            const localMsgType = hdr & 0x0F;
+          if (isCompressed) {
+            const localMsgType = (hdr >> 5) & 0x03;
+            const def = defs[localMsgType];
+            if (!def) continue;
+
+            const isLittle = def.isLittle;
+            const msgData = {};
+            for (const field of def.fields) {
+              if (idx + field.size > data.length) break;
+              msgData[field.num] = { raw: data.subarray(idx, idx + field.size), size: field.size };
+              idx += field.size;
+            }
+            if (def.devFields) {
+              for (const df of def.devFields) idx += df.size;
+            }
+
+            if (def.gNum === 20) { // record
+              const rec = {};
+              for (const fNum in msgData) {
+                const { raw, size } = msgData[fNum];
+                const dv = new DataView(raw.buffer, raw.byteOffset, size);
+                if (fNum == 253 && size === 4) rec.timestamp = new Date((dv.getUint32(0, isLittle) + 631065600) * 1000);
+                else if (fNum == 0 && size === 4) rec.lat = dv.getInt32(0, isLittle) * (180.0 / 2147483648.0);
+                else if (fNum == 1 && size === 4) rec.lng = dv.getInt32(0, isLittle) * (180.0 / 2147483648.0);
+                else if (fNum == 78 && size === 4) rec.alt = dv.getUint32(0, isLittle) / 5.0 - 500.0;
+                else if (fNum == 2 && size === 2 && rec.alt === undefined) rec.alt = dv.getUint16(0, isLittle) / 5.0 - 500.0;
+                else if (fNum == 3 && size === 1) rec.hr = raw[0];
+                else if (fNum == 4 && size === 1) rec.cadence = raw[0];
+                else if (fNum == 73 && size === 4) rec.speed = dv.getUint32(0, isLittle) / 1000.0;
+                else if (fNum == 6 && size === 2 && rec.speed === undefined) rec.speed = dv.getUint16(0, isLittle) / 1000.0;
+                else if ((fNum == 5 || fNum == 77) && size === 4) rec.dist = dv.getUint32(0, isLittle) / 100.0;
+                else if (fNum == 7 && size === 2) rec.power = dv.getUint16(0, isLittle);
+                else if (fNum == 13 && size === 1) rec.temp = dv.getInt8(0);
+                else if (fNum == 90 && size === 1) rec.battery = raw[0];
+                else if (fNum == 61 && size === 2) rec.epe = dv.getUint16(0, isLittle) / 100.0;
+              }
+              if (rec.lat && rec.lng) records.push(rec);
+            }
+          } else {
             const isDef = (hdr & 0x40) !== 0;
             const hasDev = (hdr & 0x20) !== 0;
+            const localMsgType = hdr & 0x0F;
 
             if (isDef) {
               if (idx + 5 > bodyEnd) break;
@@ -1335,6 +1350,16 @@
                   else if (fNum == 11 && size === 1) dItem.batteryLevel = raw[0];
                 }
                 deviceInfos.push(dItem);
+              } else if (gNum === 18) { // session message (official Garmin Connect session summary)
+                const sItem = {};
+                for (const fNum in msgData) {
+                  const { raw, size } = msgData[fNum];
+                  const dv = new DataView(raw.buffer, raw.byteOffset, size);
+                  if (size === 1) sItem[fNum] = raw[0];
+                  else if (size === 2) sItem[fNum] = dv.getUint16(0, isLittle);
+                  else if (size === 4) sItem[fNum] = dv.getUint32(0, isLittle);
+                }
+                sessionData = sItem;
               } else if (gNum === 20) { // record
                 const rec = {};
                 for (const fNum in msgData) {
@@ -1358,12 +1383,6 @@
                 if (rec.lat && rec.lng) records.push(rec);
               }
             }
-          } else {
-            const localMsgType = (hdr >> 5) & 0x03;
-            const def = defs[localMsgType];
-            if (!def) break;
-            for (const field of def.fields) idx += field.size;
-            if (def.devFields) for (const df of def.devFields) idx += df.size;
           }
         }
 
@@ -1388,7 +1407,6 @@
             const timeDelta = (curr.timestamp - prev.timestamp) / 1000;
             curr.elapsedSec = prev.elapsedSec + (timeDelta > 0 ? timeDelta : 1);
 
-            // Active moving detection: speed > 0.3 m/s (~1 km/h)
             if ((curr.speed || 0) > 0.3) activeSec += (timeDelta > 0 ? timeDelta : 1);
 
             if (curr.alt !== undefined && prev.alt !== undefined) {
@@ -1399,7 +1417,15 @@
           }
         }
 
-        const finalDistKm = (records[records.length - 1].dist || calcDist) / 1000.0;
+        const rawDistKm = (records[records.length - 1].dist || calcDist) / 1000.0;
+
+        // Extract official Garmin Session Summary metrics if available
+        const officialElapsedSec = (sessionData && sessionData[7]) ? (sessionData[7] / 1000.0) : records[records.length - 1].elapsedSec;
+        const officialTimerSec = (sessionData && sessionData[8]) ? (sessionData[8] / 1000.0) : activeSec;
+        const officialDistanceKm = (sessionData && sessionData[9]) ? (sessionData[9] / 100000.0) : rawDistKm;
+        const officialAscent = (sessionData && (sessionData[22] || sessionData[11])) ? (sessionData[22] || sessionData[11]) : Math.round(asc);
+        const officialDescent = (sessionData && (sessionData[23] || sessionData[12])) ? (sessionData[23] || sessionData[12]) : Math.round(desc);
+        const officialAvgSpeed = (sessionData && (sessionData[124] || sessionData[14])) ? ((sessionData[124] || sessionData[14]) / 1000.0 * 3.6) : (officialDistanceKm / (officialTimerSec / 3600.0));
 
         // Sampling frequency & Smart Recording analysis
         const deltas = [];
@@ -1439,16 +1465,17 @@
           serialNumber: fileId.serialNumber || 'N/A',
           swVersion: deviceInfos[0]?.softwareVersion || 'N/A',
           records: records,
-          totalDistance: finalDistKm,
-          elapsedSec: records[records.length - 1].elapsedSec,
-          activeSec: activeSec > 0 ? activeSec : (records[records.length - 1].elapsedSec * 0.85),
-          ascent: asc,
-          descent: desc,
+          totalDistance: officialDistanceKm,
+          elapsedSec: officialElapsedSec,
+          activeSec: officialTimerSec,
+          ascent: officialAscent,
+          descent: officialDescent,
+          officialAvgSpeed: officialAvgSpeed,
           avgIntervalSec: avgInterval,
           percent1s: percent1s,
           is1sRecording: is1sRecording,
           gpsPointsCount: records.length,
-          pointDensityPerKm: (records.length / finalDistKm).toFixed(0),
+          pointDensityPerKm: (records.length / officialDistanceKm).toFixed(0),
           hasTempeSensor: hasTempe,
           hasSpeedSensor: hasSpeedSensor,
           deviceInfos: deviceInfos
@@ -1793,20 +1820,20 @@
       document.getElementById('mapLegendSummary').innerHTML = legendSummary;
     }
 
-    // --- 6 Synchronized Charts Grid ---
+    // --- 4 Active Synchronized Charts Grid ---
     function updateCharts() {
       if (selectedIndices.length === 0) return;
 
       const activeActs = selectedIndices.map(i => allActivities[i]);
       const offsets = calculateCommonPassageOffsets(activeActs);
 
-      const altDs = [], speedDs = [], hrDs = [], gpsDs = [], battDs = [], tempDs = [];
+      const altDs = [], speedDs = [], hrDs = [], tempDs = [];
 
       activeActs.forEach((act, colorIdx) => {
         const color = TRACK_COLORS[colorIdx % TRACK_COLORS.length];
         const label = `${act.user} (${act.deviceName})`;
 
-        const dataAlt = [], dataSpeed = [], dataHR = [], dataGPS = [], dataBatt = [], dataTemp = [];
+        const dataAlt = [], dataSpeed = [], dataHR = [], dataTemp = [];
         const { distOffset, timeOffsetSec } = offsets[colorIdx];
 
         act.records.forEach(r => {
@@ -1834,21 +1861,13 @@
           }
           dataHR.push({ x: xVal, y: hrVal });
 
-          // 4. GPS Accuracy / ePE
-          dataGPS.push({ x: xVal, y: r.epe !== undefined ? r.epe : null });
-
-          // 5. Battery Level %
-          dataBatt.push({ x: xVal, y: r.battery !== undefined ? r.battery : null });
-
-          // 6. Temperature
+          // 4. Temperature (smooth curve)
           dataTemp.push({ x: xVal, y: r.temp !== undefined ? r.temp : null });
         });
 
         altDs.push({ label, data: dataAlt, borderColor: color, backgroundColor: color + '22', fill: true, borderWidth: 2, pointRadius: 0 });
         speedDs.push({ label, data: dataSpeed, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
         hrDs.push({ label, data: dataHR, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
-        gpsDs.push({ label, data: dataGPS, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
-        battDs.push({ label, data: dataBatt, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0, tension: 0.3 });
         tempDs.push({ label, data: dataTemp, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0, tension: 0.3 });
       });
 
@@ -1885,14 +1904,12 @@
         };
       }
 
-      [chartAlt, chartSpeed, chartHR, chartGPS, chartBattery, chartTemp].forEach(c => { if (c) c.destroy(); });
+      [chartAlt, chartSpeed, chartHR, chartTemp].forEach(c => { if (c) c.destroy(); });
 
       chartAlt = new Chart(document.getElementById('chartAlt'), createChartConfig(altDs, 'Nadmořská výška (m)'));
       chartSpeed = new Chart(document.getElementById('chartSpeed'), createChartConfig(speedDs, speedMode === 'speed' ? 'Rychlost (km/h)' : 'Tempo (min/km)'));
       chartHR = new Chart(document.getElementById('chartHR'), createChartConfig(hrDs, hrMode === 'bpm' ? 'Tepy (t/min)' : '% z Max HR'));
-      chartGPS = new Chart(document.getElementById('chartGPS'), createChartConfig(gpsDs, 'Přesnost GPS ePE (m)'));
-      chartBattery = new Chart(document.getElementById('chartBattery'), createChartConfig(battDs, 'Stav Baterie (%)'));
-      chartTemp = new Chart(document.getElementById('chartTemp'), createChartConfig(tempDs, 'Teplota OKolí (°C)'));
+      chartTemp = new Chart(document.getElementById('chartTemp'), createChartConfig(tempDs, 'Teplota Okolí (°C)'));
     }
 
     function updateMapCrosshair(pointIndex) {
@@ -1950,28 +1967,26 @@
 
       addRow(t.metricDistance, activeActs.map(a => `<strong>${a.totalDistance.toFixed(2)} km</strong>`));
 
-      // Durations (Total / Moving)
+      // Official Garmin Durations (Total Elapsed / Moving Timer)
       addRow(t.metricDuration, activeActs.map(a => {
         const totFormatted = formatDuration(a.elapsedSec);
         const movFormatted = formatDuration(a.activeSec);
         return `<strong>${totFormatted}</strong> (Pohyb: ${movFormatted})`;
       }));
 
-      // Average Moving Speed (vzdálenost / čas pohybu)
+      // Official Garmin Average Moving Speed
       addRow(t.metricAvgSpeed, activeActs.map(a => {
-        const movHours = (a.activeSec || a.elapsedSec) / 3600.0;
-        const avgMovSpd = movHours > 0 ? (a.totalDistance / movHours).toFixed(1) : "0.0";
-        return `<strong>${avgMovSpd} km/h</strong>`;
+        return `<strong>${a.officialAvgSpeed.toFixed(1)} km/h</strong>`;
       }));
 
-      // Average Moving Pace
+      // Official Garmin Average Moving Pace
       addRow(t.metricAvgPace, activeActs.map(a => {
-        const movPaceSec = a.totalDistance > 0 ? ((a.activeSec || a.elapsedSec) / a.totalDistance) : 0;
+        const movPaceSec = a.officialAvgSpeed > 0 ? (3600.0 / a.officialAvgSpeed) : 0;
         return `<strong>${formatDuration(movPaceSec)} min/km</strong>`;
       }));
 
-      // Elevation Gain / Loss
-      addRow(t.metricAscent, activeActs.map(a => `<strong>+${a.ascent.toFixed(0)} m / -${a.descent.toFixed(0)} m</strong>`));
+      // Official Garmin Elevation Ascent / Descent
+      addRow(t.metricAscent, activeActs.map(a => `<strong>+${a.ascent} m / -${a.descent} m</strong>`));
 
       // Altitude Range
       addRow(t.metricAltRange, activeActs.map(a => {
@@ -2013,9 +2028,9 @@
       matrixData.push(["Celková vzdálenost (km)", ...activeActs.map(a => a.totalDistance.toFixed(2))]);
       matrixData.push(["Čas Uplynulý", ...activeActs.map(a => formatDuration(a.elapsedSec))]);
       matrixData.push(["Čas Pohybu", ...activeActs.map(a => formatDuration(a.activeSec))]);
-      matrixData.push(["Průměrná rychlost pohybu (km/h)", ...activeActs.map(a => (a.totalDistance / (a.activeSec / 3600.0)).toFixed(1))]);
-      matrixData.push(["Nastoupané metry (m)", ...activeActs.map(a => a.ascent.toFixed(0))]);
-      matrixData.push(["Sestoupané metry (m)", ...activeActs.map(a => a.descent.toFixed(0))]);
+      matrixData.push(["Průměrná rychlost pohybu (km/h)", ...activeActs.map(a => a.officialAvgSpeed.toFixed(1))]);
+      matrixData.push(["Nastoupané metry (m)", ...activeActs.map(a => a.ascent)]);
+      matrixData.push(["Sestoupané metry (m)", ...activeActs.map(a => a.descent)]);
 
       const wsMatrix = XLSX.utils.aoa_to_sheet(matrixData);
       const wb = XLSX.utils.book_new();
