@@ -554,6 +554,44 @@
       height: calc(100vh - 80px) !important;
     }
 
+    /* Leaflet Custom Map Marker Pins */
+    .map-start-pin, .map-finish-pin {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      color: #ffffff;
+      font-weight: 800;
+      font-size: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    }
+
+    .map-start-pin {
+      background: linear-gradient(135deg, #10b981, #059669);
+      border: 2px solid #ffffff;
+    }
+
+    .map-finish-pin {
+      background: linear-gradient(135deg, #ef4444, #b91c1c);
+      border: 2px solid #ffffff;
+    }
+
+    /* Custom Interactive Map Tooltip */
+    .leaflet-popup-content-wrapper {
+      background: rgba(15, 23, 42, 0.92) !important;
+      backdrop-filter: blur(12px) !important;
+      border: 1px solid var(--card-border) !important;
+      color: var(--text-main) !important;
+      border-radius: 12px !important;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5) !important;
+    }
+
+    .leaflet-popup-tip {
+      background: rgba(15, 23, 42, 0.92) !important;
+    }
+
     /* Multi-Chart Grid (Dynamic Charts) */
     .charts-grid {
       display: grid;
@@ -969,7 +1007,7 @@
           <!-- Chart 4: Ambient Temperature -->
           <div class="chart-card card-fullscreen-target" id="cardChartTemp">
             <div class="chart-header-row">
-              <div class="chart-title" id="titleTempChart"><span style="color: #2dd4bf;">●</span> 4. Teplota Okolí (°C)</div>
+              <div class="chart-title" id="titleTempChart"><span style="color: #2dd4bf;">●</span> 4. Teplota okolí (°C) [Garmin Tempe]</div>
               <div style="display:flex; gap:0.4rem;">
                 <button class="btn-action-sm" onclick="hideChart('temp')">👁️ Skrýt</button>
                 <button class="btn-action-sm" onclick="toggleFullscreen('cardChartTemp')">⛶ Celá obrazovka</button>
@@ -990,10 +1028,10 @@
             <div class="chart-wrapper"><canvas id="chartStamina"></canvas></div>
           </div>
 
-          <!-- Chart 6: Obtížnost (Grit) -->
+          <!-- Chart 6: Obtížnost -->
           <div class="chart-card card-fullscreen-target" id="cardChartGrit">
             <div class="chart-header-row">
-              <div class="chart-title" id="titleGritChart"><span style="color: #fbbf24;">●</span> 6. Obtížnost (Grit)</div>
+              <div class="chart-title" id="titleGritChart"><span style="color: #fbbf24;">●</span> 6. Obtížnost</div>
               <div style="display:flex; gap:0.4rem;">
                 <button class="btn-action-sm" onclick="hideChart('grit')">👁️ Skrýt</button>
                 <button class="btn-action-sm" onclick="toggleFullscreen('cardChartGrit')">⛶ Celá obrazovka</button>
@@ -1002,10 +1040,10 @@
             <div class="chart-wrapper"><canvas id="chartGrit"></canvas></div>
           </div>
 
-          <!-- Chart 7: Plynulost (Flow) -->
+          <!-- Chart 7: Plynulost -->
           <div class="chart-card card-fullscreen-target" id="cardChartFlow">
             <div class="chart-header-row">
-              <div class="chart-title" id="titleFlowChart"><span style="color: #f59e0b;">●</span> 7. Plynulost (Flow)</div>
+              <div class="chart-title" id="titleFlowChart"><span style="color: #f59e0b;">●</span> 7. Plynulost</div>
               <div style="display:flex; gap:0.4rem;">
                 <button class="btn-action-sm" onclick="hideChart('flow')">👁️ Skrýt</button>
                 <button class="btn-action-sm" onclick="toggleFullscreen('cardChartFlow')">⛶ Celá obrazovka</button>
@@ -1107,10 +1145,10 @@
         titleAltChart: "1. Nadmořská výška (m)",
         titleSpeedChart: "2. Rychlost / Tempo",
         titleHRChart: "3. Srdeční tep",
-        titleTempChart: "4. Teplota Okolí (°C)",
+        titleTempChart: "4. Teplota okolí (°C) [Garmin Tempe]",
         titleStaminaChart: "5. Stamina (%)",
-        titleGritChart: "6. Obtížnost (Grit)",
-        titleFlowChart: "7. Plynulost (Flow)",
+        titleGritChart: "6. Obtížnost",
+        titleFlowChart: "7. Plynulost",
         titleBatteryChart: "8. Stav Baterie (%) [ConnectIQ]",
         titleGpsQualityChart: "9. Kvalita GPS Signálu [ConnectIQ]",
         lblHiddenCharts: "Skryté grafy (klikněte pro opětovné zobrazení):",
@@ -1122,7 +1160,7 @@
         scenarioBTitle: "Opakovaná trasa",
         metricUser: "Uživatel / Název souboru",
         metricDevice: "Zařízení & Přesný Model",
-        metricFW: "Verze SW & Sériové č.",
+        metricFW: "Verze SW",
         metricSensors: "Zdroje dat & Snímače",
         metricRecordFreq: "Frekvence záznamu",
         metricPointDensity: "Hustota GPS bodů",
@@ -1136,7 +1174,7 @@
         metricAvgHR: "Průměrný ST",
         metricMaxHR: "Maximální ST",
         metricTemp: "Teplota okolí (Zdroj)",
-        metricStamina: "Stamina (Start ➔ Konec %)",
+        metricStamina: "Stamina (Počáteční ➔ Konečná %)",
         metricGrit: "Obtížnost (Max Grit)",
         metricFlow: "Plynulost (Max Flow)",
         metricDevBattery: "Baterie % [ConnectIQ]",
@@ -1173,7 +1211,7 @@
         titleAltChart: "1. Elevation Profile (m)",
         titleSpeedChart: "2. Speed / Pace",
         titleHRChart: "3. Heart Rate",
-        titleTempChart: "4. Ambient Temperature (°C)",
+        titleTempChart: "4. Ambient Temperature (°C) [Garmin Tempe]",
         titleStaminaChart: "5. Stamina (%)",
         titleGritChart: "6. Grit",
         titleFlowChart: "7. Flow",
@@ -1188,7 +1226,7 @@
         scenarioBTitle: "Route Repeat",
         metricUser: "User / File Name",
         metricDevice: "Device & Exact Model",
-        metricFW: "SW Version & Serial No.",
+        metricFW: "SW Version",
         metricSensors: "Data Sources & Sensors",
         metricRecordFreq: "Recording Frequency",
         metricPointDensity: "GPS Point Density",
@@ -1202,7 +1240,7 @@
         metricAvgHR: "Avg HR",
         metricMaxHR: "Max HR",
         metricTemp: "Ambient Temp (Source)",
-        metricStamina: "Stamina (Start ➔ End %)",
+        metricStamina: "Stamina (Initial ➔ Ending %)",
         metricGrit: "Difficulty (Max Grit)",
         metricFlow: "Flow (Max Flow)",
         metricDevBattery: "Battery % [ConnectIQ]",
@@ -1227,7 +1265,6 @@
     let selectedIndices = [];
     let suggestedGroups = [];
 
-    // Hidden charts map: 'alt', 'speed', 'hr', 'temp', 'stamina', 'grit', 'flow', 'battery', 'gpsQuality'
     let hiddenCharts = {
       alt: false,
       speed: false,
@@ -1247,6 +1284,7 @@
     let mapPolylineGroup = null;
     let mapMarkerGroup = null;
     let crosshairMarkers = [];
+    let hoverPopup = null;
 
     let chartAlt = null, chartSpeed = null, chartHR = null, chartTemp = null;
     let chartStamina = null, chartGrit = null, chartFlow = null, chartBattery = null, chartGpsQuality = null;
@@ -1301,8 +1339,8 @@
         hr: '3. Tep',
         temp: '4. Teplota',
         stamina: '5. Stamina',
-        grit: '6. Obtížnost (Grit)',
-        flow: '7. Plynulost (Flow)',
+        grit: '6. Obtížnost',
+        flow: '7. Plynulost',
         battery: '8. Baterie [ConnectIQ]',
         gpsQuality: '9. Kvalita GPS [ConnectIQ]'
       };
@@ -1429,7 +1467,24 @@
       return `${m}:${s < 10 ? '0' : ''}${s}`;
     }
 
-    // --- Spec-Compliant FIT Parser for ConnectIQ, Stamina & Grit/Flow ---
+    // --- Temperature Moving Average Smoothing Filter ---
+    function smoothTemperatureSeries(series, windowSize = 25) {
+      const result = [];
+      const half = Math.floor(windowSize / 2);
+      for (let i = 0; i < series.length; i++) {
+        let sum = 0, count = 0;
+        for (let j = Math.max(0, i - half); j <= Math.min(series.length - 1, i + half); j++) {
+          if (series[j].y !== null && series[j].y !== undefined) {
+            sum += series[j].y;
+            count++;
+          }
+        }
+        result.push({ x: series[i].x, y: count > 0 ? (sum / count) : series[i].y });
+      }
+      return result;
+    }
+
+    // --- Spec-Compliant FIT Parser ---
     function parseFitNative(arrayBuffer, filePathName) {
       try {
         const data = new Uint8Array(arrayBuffer);
@@ -1700,7 +1755,6 @@
         const onesCount = deltas.filter(d => Math.abs(d - 1) < 0.2).length;
         const percent1s = deltas.length > 0 ? (onesCount / deltas.length * 100) : 100;
 
-        // Clean user name
         let userTag = "Quatix";
         const cleanName = filePathName.split(/[/\\]/).pop().replace(/\.fit$/i, '');
         if (filePathName.includes('/') || filePathName.includes('\\')) {
@@ -1714,7 +1768,6 @@
           userTag = cleanName.split('_')[0];
         }
 
-        // Sensors & Metrics Flags
         const hasTempe = deviceInfos.some(d => d.deviceType === 25 || d.antplusDeviceType === 25);
         const hasSpeedSensor = deviceInfos.some(d => d.deviceType === 123 || d.antplusDeviceType === 123 || d.deviceType === 1);
         const hasDevFields = records.some(r => r.devBattery !== undefined || r.devGpsQuality !== undefined);
@@ -1728,7 +1781,6 @@
           productID: fileId.product,
           manufacturerID: fileId.manufacturer,
           deviceName: getDeviceName(fileId.product, fileId.manufacturer),
-          serialNumber: fileId.serialNumber || 'N/A',
           swVersion: deviceInfos[0]?.softwareVersion || 'N/A',
           records: records,
           totalDistance: officialDistanceKm,
@@ -1756,7 +1808,7 @@
       }
     }
 
-    // --- File Drag & Drop & Selection Handler ---
+    // --- File Selection Handler ---
     async function processFileListWithPaths(fileEntries) {
       if (fileEntries.length === 0) return;
 
@@ -2024,7 +2076,6 @@
 
     // --- Main Dashboard Rendering ---
     function renderDashboard() {
-      // Auto-collapse empty optional charts
       if (selectedIndices.length > 0) {
         const activeActs = selectedIndices.map(i => allActivities[i]);
         hiddenCharts.temp = !activeActs.some(a => a.records.some(r => r.temp !== undefined));
@@ -2041,7 +2092,7 @@
       renderTable();
     }
 
-    // --- Map Rendering ---
+    // --- Leaflet Map Rendering with Single Common Start/Finish Markers & Interactive Tooltips ---
     function renderMap() {
       if (!map) {
         map = L.map('map').setView([50.0755, 14.4378], 10);
@@ -2060,30 +2111,95 @@
       if (selectedIndices.length === 0) return;
 
       const bounds = L.latLngBounds();
+      const activeActs = selectedIndices.map(i => allActivities[i]);
 
+      // Calculate 1st Common Passage Point (Start) & Last Common Passage Point (Finish)
+      let commonStartLatLng = null;
+      let commonFinishLatLng = null;
+
+      if (activeActs[0] && activeActs[0].records.length > 0) {
+        const bRecs = activeActs[0].records;
+        // Start: 1st point within 50m
+        if (activeActs.length > 1 && activeActs[1].records.length > 0) {
+          const tRecs = activeActs[1].records;
+          for (let i = 0; i < Math.min(200, bRecs.length); i++) {
+            for (let j = 0; j < Math.min(200, tRecs.length); j++) {
+              if (haversineDistance(bRecs[i].lat, bRecs[i].lng, tRecs[j].lat, tRecs[j].lng) <= 50) {
+                commonStartLatLng = [bRecs[i].lat, bRecs[i].lng];
+                break;
+              }
+            }
+            if (commonStartLatLng) break;
+          }
+          // Finish: last point within 50m
+          for (let i = bRecs.length - 1; i >= Math.max(0, bRecs.length - 200); i--) {
+            for (let j = tRecs.length - 1; j >= Math.max(0, tRecs.length - 200); j--) {
+              if (haversineDistance(bRecs[i].lat, bRecs[i].lng, tRecs[j].lat, tRecs[j].lng) <= 50) {
+                commonFinishLatLng = [bRecs[i].lat, bRecs[i].lng];
+                break;
+              }
+            }
+            if (commonFinishLatLng) break;
+          }
+        }
+        if (!commonStartLatLng) commonStartLatLng = [bRecs[0].lat, bRecs[0].lng];
+        if (!commonFinishLatLng) commonFinishLatLng = [bRecs[bRecs.length - 1].lat, bRecs[bRecs.length - 1].lng];
+      }
+
+      // Add Start & Finish Markers
+      if (commonStartLatLng) {
+        const startIcon = L.divIcon({
+          className: 'map-start-pin',
+          html: '▶',
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        });
+        mapMarkerGroup.addLayer(L.marker(commonStartLatLng, { icon: startIcon }).bindTooltip("<b>Start (1. společný bod)</b>"));
+      }
+
+      if (commonFinishLatLng) {
+        const finishIcon = L.divIcon({
+          className: 'map-finish-pin',
+          html: '🏁',
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        });
+        mapMarkerGroup.addLayer(L.marker(commonFinishLatLng, { icon: finishIcon }).bindTooltip("<b>Cíl (Poslední společný bod)</b>"));
+      }
+
+      // Render Tracks & Crosshairs
       selectedIndices.forEach((actIdx, colorIdx) => {
         const act = allActivities[actIdx];
         const color = TRACK_COLORS[colorIdx % TRACK_COLORS.length];
         const latLngs = act.records.map(r => [r.lat, r.lng]);
 
         if (latLngs.length > 0) {
-          const polyline = L.polyline(latLngs, { color: color, weight: 4, opacity: 0.85 });
-          mapPolylineGroup.addLayer(polyline);
+          const polyline = L.polyline(latLngs, { color: color, weight: 5, opacity: 0.85 }).addTo(mapPolylineGroup);
 
           latLngs.forEach(ll => bounds.extend(ll));
 
-          const startPt = latLngs[0];
-          const endPt = latLngs[latLngs.length - 1];
+          // Interactive click/hover on track line
+          polyline.on('mousemove click', (e) => {
+            const clickLL = e.latlng;
+            // find closest point in act
+            let minDist = Infinity;
+            let closestIdx = 0;
+            act.records.forEach((r, rIdx) => {
+              const d = haversineDistance(clickLL.lat, clickLL.lng, r.lat, r.lng);
+              if (d < minDist) {
+                minDist = d;
+                closestIdx = rIdx;
+              }
+            });
+            updateMapCrosshair(closestIdx);
+          });
 
-          mapMarkerGroup.addLayer(L.circleMarker(startPt, { radius: 6, color: '#10b981', fillColor: '#059669', fillOpacity: 1 }));
-          mapMarkerGroup.addLayer(L.circleMarker(endPt, { radius: 6, color: '#ef4444', fillColor: '#dc2626', fillOpacity: 1 }));
-
-          const crosshair = L.circleMarker(startPt, {
-            radius: 8,
+          const crosshair = L.circleMarker(latLngs[0], {
+            radius: 7,
             color: '#ffffff',
             fillColor: color,
             fillOpacity: 1,
-            weight: 3
+            weight: 2.5
           });
           mapMarkerGroup.addLayer(crosshair);
           crosshairMarkers.push(crosshair);
@@ -2114,7 +2230,7 @@
         const color = TRACK_COLORS[colorIdx % TRACK_COLORS.length];
         const label = `${act.user} (${act.deviceName})`;
 
-        const dataAlt = [], dataSpeed = [], dataHR = [], dataTemp = [];
+        const dataAlt = [], dataSpeed = [], dataHR = [], rawDataTemp = [];
         const dataStamina = [], dataGrit = [], dataFlow = [], dataBattery = [], dataGpsQuality = [];
 
         const { distOffset, timeOffsetSec } = offsets[colorIdx];
@@ -2126,10 +2242,8 @@
 
           if (xVal < 0) xVal = 0;
 
-          // 1. Altitude
           dataAlt.push({ x: xVal, y: r.alt !== undefined ? r.alt : null });
 
-          // 2. Speed / Pace
           let spdVal = null;
           if (r.speed !== undefined) {
             if (speedMode === 'speed') spdVal = (r.speed * 3.6);
@@ -2137,36 +2251,27 @@
           }
           dataSpeed.push({ x: xVal, y: spdVal });
 
-          // 3. HR
           let hrVal = null;
           if (r.hr !== undefined) {
             hrVal = hrMode === 'bpm' ? r.hr : (r.hr / 190.0 * 100.0);
           }
           dataHR.push({ x: xVal, y: hrVal });
 
-          // 4. Temp
-          dataTemp.push({ x: xVal, y: r.temp !== undefined ? r.temp : null });
-
-          // 5. Stamina (%)
+          rawDataTemp.push({ x: xVal, y: r.temp !== undefined ? r.temp : null });
           dataStamina.push({ x: xVal, y: r.stamina !== undefined ? r.stamina : null });
-
-          // 6. Obtížnost (Grit)
           dataGrit.push({ x: xVal, y: r.grit !== undefined ? r.grit : null });
-
-          // 7. Plynulost (Flow)
           dataFlow.push({ x: xVal, y: r.flow !== undefined ? r.flow : null });
-
-          // 8. ConnectIQ Battery (%)
           dataBattery.push({ x: xVal, y: r.devBattery !== undefined ? r.devBattery : null });
-
-          // 9. ConnectIQ GPS Quality
           dataGpsQuality.push({ x: xVal, y: r.devGpsQuality !== undefined ? r.devGpsQuality : null });
         });
+
+        // Smooth temperature series moving average filter
+        const smoothedTemp = smoothTemperatureSeries(rawDataTemp, 25);
 
         altDs.push({ label, data: dataAlt, borderColor: color, backgroundColor: color + '22', fill: true, borderWidth: 2, pointRadius: 0 });
         speedDs.push({ label, data: dataSpeed, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
         hrDs.push({ label, data: dataHR, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
-        tempDs.push({ label, data: dataTemp, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0, tension: 0.3 });
+        tempDs.push({ label, data: smoothedTemp, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0, tension: 0.45 });
         staminaDs.push({ label, data: dataStamina, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0, tension: 0.2 });
         gritDs.push({ label, data: dataGrit, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
         flowDs.push({ label, data: dataFlow, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
@@ -2207,7 +2312,7 @@
         };
       }
 
-      // Update Visibility Classes
+      // Visibility Classes
       document.getElementById('cardChartAlt').classList.toggle('is-hidden', hiddenCharts.alt);
       document.getElementById('cardChartSpeed').classList.toggle('is-hidden', hiddenCharts.speed);
       document.getElementById('cardChartHR').classList.toggle('is-hidden', hiddenCharts.hr);
@@ -2223,22 +2328,60 @@
       if (!hiddenCharts.alt) chartAlt = new Chart(document.getElementById('chartAlt'), createChartConfig(altDs, 'Nadmořská výška (m)'));
       if (!hiddenCharts.speed) chartSpeed = new Chart(document.getElementById('chartSpeed'), createChartConfig(speedDs, speedMode === 'speed' ? 'Rychlost (km/h)' : 'Tempo (min/km)'));
       if (!hiddenCharts.hr) chartHR = new Chart(document.getElementById('chartHR'), createChartConfig(hrDs, hrMode === 'bpm' ? 'Tepy (t/min)' : '% z Max HR'));
-      if (!hiddenCharts.temp) chartTemp = new Chart(document.getElementById('chartTemp'), createChartConfig(tempDs, 'Teplota Okolí (°C)'));
+      if (!hiddenCharts.temp) chartTemp = new Chart(document.getElementById('chartTemp'), createChartConfig(tempDs, 'Teplota okolí (°C)'));
       if (!hiddenCharts.stamina) chartStamina = new Chart(document.getElementById('chartStamina'), createChartConfig(staminaDs, 'Stamina (%)'));
-      if (!hiddenCharts.grit) chartGrit = new Chart(document.getElementById('chartGrit'), createChartConfig(gritDs, 'Obtížnost (Grit)'));
-      if (!hiddenCharts.flow) chartFlow = new Chart(document.getElementById('chartFlow'), createChartConfig(flowDs, 'Plynulost (Flow)'));
+      if (!hiddenCharts.grit) chartGrit = new Chart(document.getElementById('chartGrit'), createChartConfig(gritDs, 'Obtížnost'));
+      if (!hiddenCharts.flow) chartFlow = new Chart(document.getElementById('chartFlow'), createChartConfig(flowDs, 'Plynulost'));
       if (!hiddenCharts.battery) chartBattery = new Chart(document.getElementById('chartBattery'), createChartConfig(batteryDs, 'Baterie (%)'));
       if (!hiddenCharts.gpsQuality) chartGpsQuality = new Chart(document.getElementById('chartGpsQuality'), createChartConfig(gpsQualityDs, 'Kvalita GPS'));
     }
 
+    // Interactive Map Tooltip & Synchronized Crosshair Cursor
     function updateMapCrosshair(pointIndex) {
+      if (selectedIndices.length === 0) return;
+
+      const baseAct = allActivities[selectedIndices[0]];
+      if (!baseAct || !baseAct.records[pointIndex]) return;
+
+      const basePt = baseAct.records[pointIndex];
+      const distKm = (basePt.dist / 1000.0).toFixed(2);
+
+      let tooltipHtml = `
+        <div style="font-size:0.83rem; font-family:'Inter',sans-serif; min-width:210px; padding:2px;">
+          <div style="font-weight:700; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:4px; margin-bottom:6px; color:#38bdf8;">
+            Vzdálenost: ${distKm} km &bull; Čas: ${formatDuration(basePt.elapsedSec)}
+          </div>
+      `;
+
       selectedIndices.forEach((actIdx, colorIdx) => {
         const act = allActivities[actIdx];
+        const color = TRACK_COLORS[colorIdx % TRACK_COLORS.length];
         if (act && act.records[pointIndex] && crosshairMarkers[colorIdx]) {
           const r = act.records[pointIndex];
           crosshairMarkers[colorIdx].setLatLng([r.lat, r.lng]);
+
+          const spd = r.speed ? (r.speed * 3.6).toFixed(1) : 'N/A';
+          const alt = r.alt !== undefined ? Math.round(r.alt) : 'N/A';
+          const hr = r.hr || 'N/A';
+
+          tooltipHtml += `
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px; font-weight:700;">
+              <span style="display:inline-block; width:10px; height:10px; background:${color}; border-radius:2px;"></span>
+              <span>${act.user} (${act.deviceName}):</span>
+            </div>
+            <div style="font-size:0.78rem; color:#94a3b8; padding-left:16px; margin-bottom:6px;">
+              ${spd} km/h &bull; ${alt} m &bull; ST: ${hr} t/min
+            </div>
+          `;
         }
       });
+
+      tooltipHtml += `</div>`;
+
+      if (!hoverPopup) {
+        hoverPopup = L.popup({ closeButton: false, offset: [0, -10] });
+      }
+      hoverPopup.setLatLng([basePt.lat, basePt.lng]).setContent(tooltipHtml).openOn(map);
     }
 
     // --- Side-by-Side Comparison Matrix Table ---
@@ -2266,9 +2409,9 @@
 
       addRow(t.metricUser, activeActs.map(a => `${a.user} &bull; <small style="color:var(--text-muted);">${a.filename}</small>`));
       addRow(t.metricDevice, activeActs.map(a => `<strong>${a.deviceName}</strong>`));
-      addRow(t.metricFW, activeActs.map(a => `SW v${a.swVersion} (S/N: ${a.serialNumber})`));
+      addRow(t.metricFW, activeActs.map(a => `SW v${a.swVersion}`));
 
-      // External Data Sources & Sensors
+      // Data Sources & Sensors
       addRow(t.metricSensors, activeActs.map(a => {
         let badges = `<span class="sensor-badge">${t.sensorGPS}</span>`;
         if (a.hasTempeSensor) badges += `<span class="sensor-badge sensor-tempe">${t.sensorTempe}</span>`;
@@ -2277,14 +2420,13 @@
         return badges;
       }));
 
-      // Recording Frequency & Mode
+      // Recording Frequency
       addRow(t.metricRecordFreq, activeActs.map(a => {
         const modeBadge = a.is1sRecording ? t.mode1s : t.modeSmart;
         return `<strong>${modeBadge}</strong> (Ø ${a.avgIntervalSec.toFixed(2)}s krok, ${a.percent1s.toFixed(0)}% 1s bodů)`;
       }));
 
       addRow(t.metricPointDensity, activeActs.map(a => `${a.gpsPointsCount} bodů (${a.pointDensityPerKm} bodů/km)`));
-
       addRow(t.metricDistance, activeActs.map(a => `<strong>${a.totalDistance.toFixed(2)} km</strong>`));
 
       // Official Garmin Durations
@@ -2322,7 +2464,7 @@
         return `${avgT} °C (Min: ${Math.min(...temps)}°C, Max: ${Math.max(...temps)}°C) ${srcLabel}`;
       }));
 
-      // Stamina (Start -> End %)
+      // Stamina
       addRow(t.metricStamina, activeActs.map(a => {
         const stams = a.records.map(r => r.stamina).filter(v => v !== undefined);
         if (stams.length === 0) return 'N/A';
@@ -2379,7 +2521,7 @@
 
       matrixData.push(["Uživatel / Složka", ...activeActs.map(a => a.user)]);
       matrixData.push(["Zařízení & Přesný Model", ...activeActs.map(a => a.deviceName)]);
-      matrixData.push(["SW Verze & Sériové č.", ...activeActs.map(a => `SW v${a.swVersion} (S/N: ${a.serialNumber})`)]);
+      matrixData.push(["SW Verze", ...activeActs.map(a => `SW v${a.swVersion}`)]);
       matrixData.push(["Režim Záznamu", ...activeActs.map(a => a.is1sRecording ? "1s Záznam" : "Chytrý záznam")]);
       matrixData.push(["Průměrný rozestup bodů", ...activeActs.map(a => `${a.avgIntervalSec.toFixed(2)}s`)]);
       matrixData.push(["Hustota GPS bodů", ...activeActs.map(a => `${a.gpsPointsCount} bodů (${a.pointDensityPerKm} bodů/km)`)]);
