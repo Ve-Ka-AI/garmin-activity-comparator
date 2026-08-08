@@ -742,9 +742,9 @@
 
     <!-- Upload Dropzone -->
     <div class="dropzone" id="dropzone">
-      <!-- Two hidden inputs: one for individual files, one for whole folder trees -->
-      <input type="file" id="fileInputFiles" multiple accept=".fit,.FIT" style="display:none;" onchange="handleFileSelect(event)">
-      <input type="file" id="fileInputFolder" webkitdirectory directory multiple accept=".fit,.FIT" style="display:none;" onchange="handleFileSelect(event)">
+      <!-- Hidden file inputs without accept attribute to prevent Windows Explorer file filtering issues -->
+      <input type="file" id="fileInputFiles" multiple style="display:none;" onchange="handleFileSelect(event)">
+      <input type="file" id="fileInputFolder" webkitdirectory directory multiple style="display:none;" onchange="handleFileSelect(event)">
 
       <div class="cloud-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -1378,6 +1378,9 @@
     }
 
     // --- HTML5 Drag and Drop Event Handling ---
+    window.addEventListener('dragover', (e) => e.preventDefault());
+    window.addEventListener('drop', (e) => e.preventDefault());
+
     const dropzone = document.getElementById('dropzone');
     dropzone.addEventListener('dragover', (e) => {
       e.preventDefault();
