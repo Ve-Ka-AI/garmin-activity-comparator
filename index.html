@@ -2218,29 +2218,25 @@
 
       // Render Tracks & Crosshairs
       selectedIndices.forEach((actIdx, colorIdx) => {
-        const act = allActivities[actIdx];
-        const color = TRACK_COLORS[colorIdx % TRACK_COLORS.length];
-        const latLngs = act.records.map(r => [r.lat, r.lng]);
-
-        if (latLngs.length > 0) {
-          const polyline = L.polyline(latLngs, { color: color, weight: 5, opacity: 0.85 }).addTo(mapPolylineGroup);
-
-          latLngs.forEach(ll => bounds.extend(ll));
-
-          // Interactive click/hover on track line
+        const ac          // Interactive click/hover on track line
           polyline.on('mousemove click', (e) => {
             const clickLL = e.latlng;
-            // find closest point in act
             let minDist = Infinity;
-            let closestIdx = 0;
-            act.records.forEach((r, rIdx) => {
+            let closestPt = act.records[0];
+            act.records.forEach((r) => {
               const d = haversineDistance(clickLL.lat, clickLL.lng, r.lat, r.lng);
               if (d < minDist) {
                 minDist = d;
-                closestIdx = rIdx;
+                closestPt = r;
               }
             });
-            updateMapCrosshair(closestIdx);
+            const offsets = calculateCommonPassageOffsets(activeActs);
+            const { distOffset, timeOffsetSec } = offsets[colorIdx];
+            const targetX = xAxisMode === 'time'
+              ? ((closestPt.elapsedSec - timeOffsetSec) / 60.0)
+              : ((closestPt.dist / 1000.0) - distOffset);
+
+            updateMapCrosshairByX(targetX);
           });
 
           const crosshair = L.circleMarker(latLngs[0], {
@@ -2315,7 +2311,7 @@
         });
 
         // Smooth temperature series moving average filter
-        const smoothedTemp = smoothTemperatureSeries(rawDataTemp, 25);
+        const smoothedTemp = smoothTemperatureSeries(rawDataTemp);
 
         altDs.push({ label, data: dataAlt, borderColor: color, backgroundColor: color + '22', fill: true, borderWidth: 2, pointRadius: 0 });
         speedDs.push({ label, data: dataSpeed, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
@@ -2338,11 +2334,18 @@
             responsive: true,
             maintainAspectRatio: false,
             animation: false,
-            interaction: { mode: 'index', intersect: false },
+            interaction: { mode: 'nearest', axis: 'x', intersect: false },
             plugins: {
               legend: { display: false },
               tooltip: {
                 callbacks: {
+                  title: (tooltipItems) => {
+                    if (!tooltipItems || tooltipItems.length === 0) return '';
+                    const xVal = tooltipItems[0].parsed.x;
+                    return xAxisMode === 'time'
+                      ? `Čas: ${xVal.toFixed(1)} min`
+                      : `Vzdálenost: ${xVal.toFixed(2)} km`;
+                  },
                   label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1) : 'N/A'}`
                 }
               }
@@ -2352,9 +2355,11 @@
               y: { title: { display: true, text: yTitle, color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }
             },
             onHover: (evt, activeElements) => {
-              if (activeElements.length > 0) {
-                const dataIdx = activeElements[0].index;
-                updateMapCrosshair(dataIdx);
+              if (activeElements.length > 0 && activeElements[0].element && activeElements[0].element.$context) {
+                const rawPoint = activeElements[0].element.$context.raw;
+                if (rawPoint && rawPoint.x !== undefined) {
+                  updateMapCrosshairByX(rawPoint.x);
+                }
               }
             }
           }
@@ -2385,33 +2390,50 @@
       if (!hiddenCharts.gpsQuality) chartGpsQuality = new Chart(document.getElementById('chartGpsQuality'), createChartConfig(gpsQualityDs, 'Kvalita GPS'));
     }
 
-    // Interactive Map Tooltip & Synchronized Crosshair Cursor
-    function updateMapCrosshair(pointIndex) {
+    // Interactive Map Tooltip & Synchronized Crosshair Cursor By Exact X-Axis Value
+    function updateMapCrosshairByX(targetXVal) {
       if (selectedIndices.length === 0) return;
 
-      const baseAct = allActivities[selectedIndices[0]];
-      if (!baseAct || !baseAct.records[pointIndex]) return;
-
-      const basePt = baseAct.records[pointIndex];
-      const distKm = (basePt.dist / 1000.0).toFixed(2);
+      const activeActs = selectedIndices.map(i => allActivities[i]);
+      const offsets = calculateCommonPassageOffsets(activeActs);
 
       let tooltipHtml = `
         <div style="font-size:0.83rem; font-family:'Inter',sans-serif; min-width:210px; padding:2px;">
           <div style="font-weight:700; border-bottom:1px solid rgba(255,255,255,0.2); padding-bottom:4px; margin-bottom:6px; color:#38bdf8;">
-            Vzdálenost: ${distKm} km &bull; Čas: ${formatDuration(basePt.elapsedSec)}
+            ${xAxisMode === 'time' ? `Čas: ${targetXVal.toFixed(1)} min` : `Vzdálenost: ${targetXVal.toFixed(2)} km`}
           </div>
       `;
+
+      let basePtForPopup = null;
 
       selectedIndices.forEach((actIdx, colorIdx) => {
         const act = allActivities[actIdx];
         const color = TRACK_COLORS[colorIdx % TRACK_COLORS.length];
-        if (act && act.records[pointIndex] && crosshairMarkers[colorIdx]) {
-          const r = act.records[pointIndex];
-          crosshairMarkers[colorIdx].setLatLng([r.lat, r.lng]);
+        const { distOffset, timeOffsetSec } = offsets[colorIdx];
 
-          const spd = r.speed ? (r.speed * 3.6).toFixed(1) : 'N/A';
-          const alt = r.alt !== undefined ? Math.round(r.alt) : 'N/A';
-          const hr = r.hr || 'N/A';
+        if (act && act.records.length > 0 && crosshairMarkers[colorIdx]) {
+          let closestRec = act.records[0];
+          let minDiff = Infinity;
+
+          for (let i = 0; i < act.records.length; i++) {
+            const r = act.records[i];
+            const xVal = xAxisMode === 'time'
+              ? ((r.elapsedSec - timeOffsetSec) / 60.0)
+              : ((r.dist / 1000.0) - distOffset);
+            const diff = Math.abs(xVal - targetXVal);
+            if (diff < minDiff) {
+              minDiff = diff;
+              closestRec = r;
+            }
+          }
+
+          if (colorIdx === 0) basePtForPopup = closestRec;
+
+          crosshairMarkers[colorIdx].setLatLng([closestRec.lat, closestRec.lng]);
+
+          const spd = closestRec.speed ? (closestRec.speed * 3.6).toFixed(1) : 'N/A';
+          const alt = closestRec.alt !== undefined ? Math.round(closestRec.alt) : 'N/A';
+          const hr = closestRec.hr || 'N/A';
 
           tooltipHtml += `
             <div style="display:flex; align-items:center; gap:6px; margin-bottom:2px; font-weight:700;">
@@ -2427,10 +2449,12 @@
 
       tooltipHtml += `</div>`;
 
-      if (!hoverPopup) {
-        hoverPopup = L.popup({ closeButton: false, offset: [0, -10] });
+      if (basePtForPopup && map) {
+        if (!hoverPopup) {
+          hoverPopup = L.popup({ closeButton: false, offset: [0, -10] });
+        }
+        hoverPopup.setLatLng([basePtForPopup.lat, basePtForPopup.lng]).setContent(tooltipHtml).openOn(map);
       }
-      hoverPopup.setLatLng([basePt.lat, basePt.lng]).setContent(tooltipHtml).openOn(map);
     }
 
     // --- Side-by-Side Comparison Matrix Table ---
