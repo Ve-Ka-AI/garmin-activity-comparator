@@ -2322,6 +2322,7 @@
           const { distOffset } = offsets[colorIdx];
           const projDists = [];
           let lastIdx = 0;
+          let lastX = -1;
           const bRecs = baseAct.records;
 
           for (let i = 0; i < act.records.length; i++) {
@@ -2341,6 +2342,10 @@
                 lastIdx = j;
               }
             }
+            if (bestBDist <= lastX) {
+              bestBDist = lastX + 0.0001;
+            }
+            lastX = bestBDist;
             projDists.push(bestBDist);
           }
           return projDists;
@@ -2447,6 +2452,9 @@
             plugins: {
               legend: { display: false },
               tooltip: {
+                filter: (tooltipItem, index, tooltipItems) => {
+                  return tooltipItems.findIndex(t => t.datasetIndex === tooltipItem.datasetIndex) === index;
+                },
                 callbacks: {
                   title: (tooltipItems) => {
                     if (!tooltipItems || tooltipItems.length === 0) return '';
