@@ -2347,6 +2347,42 @@
         });
       }
 
+      let movingTimeArrays = [];
+      if (xAxisMode === 'time' && activeActs.length > 0) {
+        const globalStartTS = offsets[0].commonStartTS || (activeActs[0].records[0].timestamp ? activeActs[0].records[0].timestamp.getTime() : 0);
+        const globalFinishTS = offsets[0].commonFinishTS || (activeActs[0].records[activeActs[0].records.length - 1].timestamp ? activeActs[0].records[activeActs[0].records.length - 1].timestamp.getTime() : Infinity);
+
+        movingTimeArrays = activeActs.map((act) => {
+          let accumSec = 0.0;
+          const movTimes = [];
+          for (let i = 0; i < act.records.length; i++) {
+            const curr = act.records[i];
+            if (!curr.timestamp) {
+              movTimes.push(i === 0 ? 0 : movTimes[i - 1]);
+              continue;
+            }
+            const ts = curr.timestamp.getTime();
+            if (alignCommonPoint && (ts < globalStartTS || ts > globalFinishTS)) {
+              movTimes.push(-1);
+              continue;
+            }
+            if (i === 0 || movTimes[i - 1] === -1) {
+              movTimes.push(accumSec / 60.0);
+            } else {
+              const prev = act.records[i - 1];
+              const dt = prev.timestamp ? (ts - prev.timestamp.getTime()) / 1000.0 : 1;
+              if (dt > 0 && dt < 300) {
+                if ((curr.speed || 0) > 0.3) {
+                  accumSec += dt;
+                }
+              }
+              movTimes.push(accumSec / 60.0);
+            }
+          }
+          return movTimes;
+        });
+      }
+
       const altDs = [], speedDs = [], hrDs = [], tempDs = [];
       const staminaDs = [], gritDs = [], flowDs = [], batteryDs = [], gpsQualityDs = [];
 
@@ -2357,27 +2393,27 @@
         const dataAlt = [], dataSpeed = [], dataHR = [], rawDataTemp = [];
         const dataStamina = [], dataGrit = [], dataFlow = [], dataBattery = [], dataGpsQuality = [];
 
-        const { distOffset, timeOffsetSec } = offsets[colorIdx];
+        const { distOffset } = offsets[colorIdx];
 
         act.records.forEach((r, rIdx) => {
-          if (alignCommonPoint && offsets[colorIdx].commonStartTS && r.timestamp) {
-            const rTS = r.timestamp.getTime();
-            if (rTS < offsets[colorIdx].commonStartTS) return;
-            if (offsets[colorIdx].commonFinishTS && rTS > offsets[colorIdx].commonFinishTS) return;
-          }
-
           let xVal = 0;
           if (xAxisMode === 'time') {
-            const startTS = offsets[colorIdx].commonStartTS || (act.records[0].timestamp ? act.records[0].timestamp.getTime() : 0);
-            if (r.timestamp) {
-              xVal = (r.timestamp.getTime() - startTS) / 60000.0;
-            } else {
-              xVal = ((r.elapsedSec - timeOffsetSec) / 60.0);
-            }
+            xVal = movingTimeArrays[colorIdx][rIdx];
+            if (xVal < 0) return;
           } else if (xAxisMode === 'geodist') {
             xVal = mapMatchedDists[colorIdx][rIdx];
+            if (alignCommonPoint && offsets[colorIdx].commonStartTS && r.timestamp) {
+              const rTS = r.timestamp.getTime();
+              if (rTS < offsets[colorIdx].commonStartTS) return;
+              if (offsets[colorIdx].commonFinishTS && rTS > offsets[colorIdx].commonFinishTS) return;
+            }
           } else {
             xVal = ((r.dist / 1000.0) - distOffset);
+            if (alignCommonPoint && offsets[colorIdx].commonStartTS && r.timestamp) {
+              const rTS = r.timestamp.getTime();
+              if (rTS < offsets[colorIdx].commonStartTS) return;
+              if (offsets[colorIdx].commonFinishTS && rTS > offsets[colorIdx].commonFinishTS) return;
+            }
           }
 
           if (xVal < 0) xVal = 0;
