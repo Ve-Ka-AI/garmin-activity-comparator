@@ -2095,65 +2095,68 @@
 
     // --- First & Last Common Passage Point Alignment Algorithm ---
     function calculateCommonPassageOffsets(activeActs) {
-      const offsets = activeActs.map(() => ({ distOffset: 0, timeOffsetSec: 0, commonStartTS: null, commonFinishTS: null }));
+      const offsets = activeActs.map(() => ({ distOffset: 0, timeOffsetSec: 0, commonStartTS: null, commonFinishTS: null, startIdx: 0, finishIdx: 0 }));
       if (activeActs.length === 0 || !activeActs[0].records || activeActs[0].records.length === 0) return offsets;
 
       const baseAct = activeActs[0];
-      const baseStartTS = baseAct.records[0].timestamp ? baseAct.records[0].timestamp.getTime() : null;
-      const baseFinishTS = baseAct.records[baseAct.records.length - 1].timestamp ? baseAct.records[baseAct.records.length - 1].timestamp.getTime() : null;
+      const bRecs = baseAct.records;
+      const baseStartTS = bRecs[0].timestamp ? bRecs[0].timestamp.getTime() : null;
+      const baseFinishTS = bRecs[bRecs.length - 1].timestamp ? bRecs[bRecs.length - 1].timestamp.getTime() : null;
 
       offsets[0].commonStartTS = baseStartTS;
       offsets[0].commonFinishTS = baseFinishTS;
+      offsets[0].startIdx = 0;
+      offsets[0].finishIdx = bRecs.length - 1;
 
       if (!alignCommonPoint || activeActs.length < 2) {
         activeActs.forEach((act, k) => {
-          if (k > 0 && act.records && act.records.length > 0 && act.records[0].timestamp) {
-            offsets[k].commonStartTS = act.records[0].timestamp.getTime();
-            offsets[k].commonFinishTS = act.records[act.records.length - 1].timestamp.getTime();
+          if (k > 0 && act.records && act.records.length > 0) {
+            offsets[k].commonStartTS = act.records[0].timestamp ? act.records[0].timestamp.getTime() : null;
+            offsets[k].commonFinishTS = act.records[act.records.length - 1].timestamp ? act.records[act.records.length - 1].timestamp.getTime() : null;
+            offsets[k].startIdx = 0;
+            offsets[k].finishIdx = act.records.length - 1;
           }
         });
         return offsets;
       }
 
+      // Find 1st & Last Common Passage Points in baseAct & targetActs within 50m
+      const tRecs = activeActs[1].records;
+      let qStart = 0, fStart = 0;
+      for (let i = 0; i < Math.min(200, bRecs.length); i++) {
+        for (let j = 0; j < Math.min(200, tRecs.length); j++) {
+          if (haversineDistance(bRecs[i].lat, bRecs[i].lng, tRecs[j].lat, tRecs[j].lng) <= 50) {
+            qStart = i;
+            fStart = j;
+            break;
+          }
+        }
+        if (qStart > 0 || fStart > 0) break;
+      }
+
+      let qFinish = bRecs.length - 1, fFinish = tRecs.length - 1;
+      for (let i = bRecs.length - 1; i >= Math.max(0, bRecs.length - 300); i--) {
+        for (let j = tRecs.length - 1; j >= Math.max(0, tRecs.length - 300); j--) {
+          if (haversineDistance(bRecs[i].lat, bRecs[i].lng, tRecs[j].lat, tRecs[j].lng) <= 50) {
+            qFinish = i;
+            fFinish = j;
+            break;
+          }
+        }
+        if (qFinish < bRecs.length - 1) break;
+      }
+
+      offsets[0].startIdx = qStart;
+      offsets[0].finishIdx = qFinish;
+
       for (let k = 1; k < activeActs.length; k++) {
         const targetAct = activeActs[k];
         if (!targetAct.records || targetAct.records.length === 0) continue;
-
-        // Find Target Activity record closest in UTC timestamp to baseStartTS
-        if (baseStartTS) {
-          let minDiff = Infinity;
-          let bestIdx = 0;
-          for (let j = 0; j < targetAct.records.length; j++) {
-            if (targetAct.records[j].timestamp) {
-              const diff = Math.abs(targetAct.records[j].timestamp.getTime() - baseStartTS);
-              if (diff < minDiff) {
-                minDiff = diff;
-                bestIdx = j;
-              }
-            }
-          }
-          const startPt = targetAct.records[bestIdx];
-          offsets[k].commonStartTS = startPt.timestamp ? startPt.timestamp.getTime() : null;
-          offsets[k].distOffset = (startPt.dist || 0) / 1000.0 - (baseAct.records[0].dist || 0) / 1000.0;
-          offsets[k].timeOffsetSec = (startPt.elapsedSec || 0) - (baseAct.records[0].elapsedSec || 0);
-        }
-
-        // Find Target Activity record closest in UTC timestamp to baseFinishTS
-        if (baseFinishTS) {
-          let minDiff = Infinity;
-          let bestIdx = targetAct.records.length - 1;
-          for (let j = 0; j < targetAct.records.length; j++) {
-            if (targetAct.records[j].timestamp) {
-              const diff = Math.abs(targetAct.records[j].timestamp.getTime() - baseFinishTS);
-              if (diff < minDiff) {
-                minDiff = diff;
-                bestIdx = j;
-              }
-            }
-          }
-          const finishPt = targetAct.records[bestIdx];
-          offsets[k].commonFinishTS = finishPt.timestamp ? finishPt.timestamp.getTime() : null;
-        }
+        offsets[k].startIdx = (k === 1) ? fStart : 0;
+        offsets[k].finishIdx = (k === 1) ? fFinish : targetAct.records.length - 1;
+        offsets[k].distOffset = (targetAct.records[offsets[k].startIdx].dist || 0) / 1000.0 - (bRecs[qStart].dist || 0) / 1000.0;
+        offsets[k].commonStartTS = targetAct.records[offsets[k].startIdx].timestamp ? targetAct.records[offsets[k].startIdx].timestamp.getTime() : null;
+        offsets[k].commonFinishTS = targetAct.records[offsets[k].finishIdx].timestamp ? targetAct.records[offsets[k].finishIdx].timestamp.getTime() : null;
       }
       return offsets;
     }
@@ -2347,39 +2350,62 @@
         });
       }
 
-      let movingTimeArrays = [];
+      let mapMatchedTimes = [];
       if (xAxisMode === 'time' && activeActs.length > 0) {
-        const globalStartTS = offsets[0].commonStartTS || (activeActs[0].records[0].timestamp ? activeActs[0].records[0].timestamp.getTime() : 0);
-        const globalFinishTS = offsets[0].commonFinishTS || (activeActs[0].records[activeActs[0].records.length - 1].timestamp ? activeActs[0].records[activeActs[0].records.length - 1].timestamp.getTime() : Infinity);
+        const baseAct = activeActs[0];
+        const { startIdx: qStart, finishIdx: qFinish } = offsets[0];
 
-        movingTimeArrays = activeActs.map((act) => {
-          let accumSec = 0.0;
-          const movTimes = [];
-          for (let i = 0; i < act.records.length; i++) {
-            const curr = act.records[i];
-            if (!curr.timestamp) {
-              movTimes.push(i === 0 ? 0 : movTimes[i - 1]);
-              continue;
-            }
-            const ts = curr.timestamp.getTime();
-            if (alignCommonPoint && (ts < globalStartTS || ts > globalFinishTS)) {
-              movTimes.push(-1);
-              continue;
-            }
-            if (i === 0 || movTimes[i - 1] === -1) {
-              movTimes.push(accumSec / 60.0);
-            } else {
-              const prev = act.records[i - 1];
-              const dt = prev.timestamp ? (ts - prev.timestamp.getTime()) / 1000.0 : 1;
-              if (dt > 0 && dt < 300) {
-                if ((curr.speed || 0) > 0.3) {
-                  accumSec += dt;
-                }
+        // Compute Base active moving time
+        const baseMovTimes = new Array(baseAct.records.length).fill(-1);
+        let accumSec = 0.0;
+        for (let i = qStart; i <= qFinish; i++) {
+          if (i === qStart) {
+            baseMovTimes[i] = 0;
+          } else {
+            const curr = baseAct.records[i];
+            const prev = baseAct.records[i - 1];
+            const dt = curr.timestamp && prev.timestamp ? (curr.timestamp.getTime() - prev.timestamp.getTime()) / 1000 : 1;
+            if (dt > 0 && dt < 300) {
+              if ((curr.speed || 0) > 0.3) {
+                accumSec += dt;
               }
-              movTimes.push(accumSec / 60.0);
             }
+            baseMovTimes[i] = accumSec / 60.0;
           }
-          return movTimes;
+        }
+
+        mapMatchedTimes = activeActs.map((act, colorIdx) => {
+          if (colorIdx === 0) return baseMovTimes;
+
+          const { startIdx: fStart, finishIdx: fFinish } = offsets[colorIdx];
+          const projTimes = new Array(act.records.length).fill(-1);
+          let lastJ = qStart;
+
+          for (let i = fStart; i <= fFinish; i++) {
+            const fPt = act.records[i];
+            let minD = Infinity;
+            let bestTime = baseMovTimes[lastJ];
+
+            const searchS = Math.max(qStart, lastJ - 150);
+            const searchE = Math.min(qFinish + 1, lastJ + 300);
+
+            for (let j = searchS; j < searchE; j++) {
+              const bPt = baseAct.records[j];
+              const d = haversineDistance(fPt.lat, fPt.lng, bPt.lat, bPt.lng);
+              if (d < minD) {
+                minD = d;
+                bestTime = baseMovTimes[j];
+                lastJ = j;
+              }
+            }
+
+            let dtDelta = 0;
+            if (fPt.timestamp && baseAct.records[lastJ].timestamp) {
+              dtDelta = (fPt.timestamp.getTime() - baseAct.records[lastJ].timestamp.getTime()) / 60000.0;
+            }
+            projTimes[i] = Math.max(0, bestTime + dtDelta);
+          }
+          return projTimes;
         });
       }
 
@@ -2393,27 +2419,19 @@
         const dataAlt = [], dataSpeed = [], dataHR = [], rawDataTemp = [];
         const dataStamina = [], dataGrit = [], dataFlow = [], dataBattery = [], dataGpsQuality = [];
 
-        const { distOffset } = offsets[colorIdx];
+        const { distOffset, startIdx, finishIdx } = offsets[colorIdx];
 
         act.records.forEach((r, rIdx) => {
+          if (alignCommonPoint && (rIdx < startIdx || rIdx > finishIdx)) return;
+
           let xVal = 0;
           if (xAxisMode === 'time') {
-            xVal = movingTimeArrays[colorIdx][rIdx];
+            xVal = mapMatchedTimes[colorIdx][rIdx];
             if (xVal < 0) return;
           } else if (xAxisMode === 'geodist') {
             xVal = mapMatchedDists[colorIdx][rIdx];
-            if (alignCommonPoint && offsets[colorIdx].commonStartTS && r.timestamp) {
-              const rTS = r.timestamp.getTime();
-              if (rTS < offsets[colorIdx].commonStartTS) return;
-              if (offsets[colorIdx].commonFinishTS && rTS > offsets[colorIdx].commonFinishTS) return;
-            }
           } else {
             xVal = ((r.dist / 1000.0) - distOffset);
-            if (alignCommonPoint && offsets[colorIdx].commonStartTS && r.timestamp) {
-              const rTS = r.timestamp.getTime();
-              if (rTS < offsets[colorIdx].commonStartTS) return;
-              if (offsets[colorIdx].commonFinishTS && rTS > offsets[colorIdx].commonFinishTS) return;
-            }
           }
 
           if (xVal < 0) xVal = 0;
