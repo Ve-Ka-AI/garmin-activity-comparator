@@ -848,8 +848,9 @@
       <div class="toggle-group">
         <span class="toggle-label" id="lblXAxis">Osa X (Grafy):</span>
         <div class="btn-segmented">
+          <button class="seg-btn active" id="btnXGeoDist" onclick="setXAxis('geodist')" title="Geografické lícování tras v mapě (lícování vrcholů a údolí)">Trasa MAPA</button>
+          <button class="seg-btn" id="btnXDist" onclick="setXAxis('distance')" title="Vzdálenost naměřená snímačem hodinek">Snímač</button>
           <button class="seg-btn" id="btnXTime" onclick="setXAxis('time')">Čas</button>
-          <button class="seg-btn active" id="btnXDist" onclick="setXAxis('distance')">Vzdálenost</button>
         </div>
       </div>
 
@@ -1278,7 +1279,7 @@
 
     // --- State Variables ---
     let currentLang = 'cz';
-    let xAxisMode = 'distance';
+    let xAxisMode = 'geodist';
     let speedMode = 'speed';
     let hrMode = 'bpm';
     let alignCommonPoint = true;
@@ -1446,8 +1447,9 @@
 
     function setXAxis(mode) {
       xAxisMode = mode;
-      document.getElementById('btnXTime').classList.toggle('active', mode === 'time');
+      document.getElementById('btnXGeoDist').classList.toggle('active', mode === 'geodist');
       document.getElementById('btnXDist').classList.toggle('active', mode === 'distance');
+      document.getElementById('btnXTime').classList.toggle('active', mode === 'time');
       if (selectedIndices.length > 0) updateCharts();
     }
 
@@ -2277,6 +2279,41 @@
       const activeActs = selectedIndices.map(i => allActivities[i]);
       const offsets = calculateCommonPassageOffsets(activeActs);
 
+      let mapMatchedDists = [];
+      if (xAxisMode === 'geodist' && activeActs.length > 0) {
+        const baseAct = activeActs[0];
+        mapMatchedDists = activeActs.map((act, colorIdx) => {
+          if (colorIdx === 0) {
+            return act.records.map(r => (r.dist / 1000.0) - offsets[0].distOffset);
+          }
+          const { distOffset } = offsets[colorIdx];
+          const projDists = [];
+          let lastIdx = 0;
+          const bRecs = baseAct.records;
+
+          for (let i = 0; i < act.records.length; i++) {
+            const tPt = act.records[i];
+            let minD = Infinity;
+            let bestBDist = (tPt.dist / 1000.0) - distOffset;
+
+            const searchStart = Math.max(0, lastIdx - 150);
+            const searchEnd = Math.min(bRecs.length, lastIdx + 300);
+
+            for (let j = searchStart; j < searchEnd; j++) {
+              const bPt = bRecs[j];
+              const d = haversineDistance(tPt.lat, tPt.lng, bPt.lat, bPt.lng);
+              if (d < minD) {
+                minD = d;
+                bestBDist = (bPt.dist / 1000.0) - offsets[0].distOffset;
+                lastIdx = j;
+              }
+            }
+            projDists.push(bestBDist);
+          }
+          return projDists;
+        });
+      }
+
       const altDs = [], speedDs = [], hrDs = [], tempDs = [];
       const staminaDs = [], gritDs = [], flowDs = [], batteryDs = [], gpsQualityDs = [];
 
@@ -2289,10 +2326,15 @@
 
         const { distOffset, timeOffsetSec } = offsets[colorIdx];
 
-        act.records.forEach(r => {
-          let xVal = xAxisMode === 'time'
-            ? ((r.elapsedSec - timeOffsetSec) / 60.0)
-            : ((r.dist / 1000.0) - distOffset);
+        act.records.forEach((r, rIdx) => {
+          let xVal = 0;
+          if (xAxisMode === 'time') {
+            xVal = ((r.elapsedSec - timeOffsetSec) / 60.0);
+          } else if (xAxisMode === 'geodist') {
+            xVal = mapMatchedDists[colorIdx][rIdx];
+          } else {
+            xVal = ((r.dist / 1000.0) - distOffset);
+          }
 
           if (xVal < 0) xVal = 0;
 
