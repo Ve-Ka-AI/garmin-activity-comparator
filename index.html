@@ -2350,62 +2350,25 @@
         });
       }
 
-      let mapMatchedTimes = [];
+      let timeArrays = [];
       if (xAxisMode === 'time' && activeActs.length > 0) {
-        const baseAct = activeActs[0];
-        const { startIdx: qStart, finishIdx: qFinish } = offsets[0];
+        timeArrays = activeActs.map((act, colorIdx) => {
+          const { startIdx, finishIdx } = offsets[colorIdx];
+          const times = new Array(act.records.length).fill(-1);
+          if (startIdx < act.records.length && act.records[startIdx]) {
+            const startTS = act.records[startIdx].timestamp ? act.records[startIdx].timestamp.getTime() : null;
+            const startElapsed = act.records[startIdx].elapsedSec || 0;
 
-        // Compute Base active moving time
-        const baseMovTimes = new Array(baseAct.records.length).fill(-1);
-        let accumSec = 0.0;
-        for (let i = qStart; i <= qFinish; i++) {
-          if (i === qStart) {
-            baseMovTimes[i] = 0;
-          } else {
-            const curr = baseAct.records[i];
-            const prev = baseAct.records[i - 1];
-            const dt = curr.timestamp && prev.timestamp ? (curr.timestamp.getTime() - prev.timestamp.getTime()) / 1000 : 1;
-            if (dt > 0 && dt < 300) {
-              if ((curr.speed || 0) > 0.3) {
-                accumSec += dt;
+            for (let i = startIdx; i <= finishIdx; i++) {
+              const r = act.records[i];
+              if (r.timestamp && startTS) {
+                times[i] = (r.timestamp.getTime() - startTS) / 60000.0;
+              } else {
+                times[i] = ((r.elapsedSec || 0) - startElapsed) / 60.0;
               }
             }
-            baseMovTimes[i] = accumSec / 60.0;
           }
-        }
-
-        mapMatchedTimes = activeActs.map((act, colorIdx) => {
-          if (colorIdx === 0) return baseMovTimes;
-
-          const { startIdx: fStart, finishIdx: fFinish } = offsets[colorIdx];
-          const projTimes = new Array(act.records.length).fill(-1);
-          let lastJ = qStart;
-
-          for (let i = fStart; i <= fFinish; i++) {
-            const fPt = act.records[i];
-            let minD = Infinity;
-            let bestTime = baseMovTimes[lastJ];
-
-            const searchS = Math.max(qStart, lastJ - 150);
-            const searchE = Math.min(qFinish + 1, lastJ + 300);
-
-            for (let j = searchS; j < searchE; j++) {
-              const bPt = baseAct.records[j];
-              const d = haversineDistance(fPt.lat, fPt.lng, bPt.lat, bPt.lng);
-              if (d < minD) {
-                minD = d;
-                bestTime = baseMovTimes[j];
-                lastJ = j;
-              }
-            }
-
-            let dtDelta = 0;
-            if (fPt.timestamp && baseAct.records[lastJ].timestamp) {
-              dtDelta = (fPt.timestamp.getTime() - baseAct.records[lastJ].timestamp.getTime()) / 60000.0;
-            }
-            projTimes[i] = Math.max(0, bestTime + dtDelta);
-          }
-          return projTimes;
+          return times;
         });
       }
 
@@ -2426,7 +2389,7 @@
 
           let xVal = 0;
           if (xAxisMode === 'time') {
-            xVal = mapMatchedTimes[colorIdx][rIdx];
+            xVal = timeArrays[colorIdx][rIdx];
             if (xVal < 0) return;
           } else if (xAxisMode === 'geodist') {
             xVal = mapMatchedDists[colorIdx][rIdx];
