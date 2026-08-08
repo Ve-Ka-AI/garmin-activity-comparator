@@ -251,16 +251,6 @@
       box-shadow: 0 12px 30px rgba(56, 189, 248, 0.2);
     }
 
-    .dropzone input[type="file"] {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      opacity: 0;
-      cursor: pointer;
-    }
-
     .cloud-icon {
       width: 56px;
       height: 56px;
@@ -505,6 +495,44 @@
       gap: 1.5rem;
     }
 
+    /* Card Fullscreen Mode Support */
+    .card-fullscreen-target {
+      position: relative;
+    }
+
+    .card-fullscreen-target.is-fullscreen {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      z-index: 9999 !important;
+      border-radius: 0 !important;
+      background: #090d16 !important;
+      padding: 1.5rem !important;
+      overflow: auto !important;
+    }
+
+    .btn-fullscreen {
+      border: 1px solid var(--card-border);
+      background: rgba(15, 23, 42, 0.6);
+      color: var(--text-muted);
+      border-radius: 6px;
+      padding: 0.25rem 0.55rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .btn-fullscreen:hover {
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+
     /* Map Card */
     .map-card {
       background: var(--card-bg);
@@ -532,7 +560,11 @@
       z-index: 1;
     }
 
-    /* Multi-Chart Grid */
+    .is-fullscreen #map {
+      height: calc(100vh - 80px) !important;
+    }
+
+    /* Multi-Chart Grid (6 charts) */
     .charts-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -557,6 +589,12 @@
       gap: 0.75rem;
     }
 
+    .chart-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
     .chart-title {
       font-size: 0.95rem;
       font-weight: 700;
@@ -569,6 +607,10 @@
       position: relative;
       height: 220px;
       width: 100%;
+    }
+
+    .is-fullscreen .chart-wrapper {
+      height: calc(100vh - 120px) !important;
     }
 
     /* Comparison Table Card */
@@ -588,6 +630,8 @@
       align-items: center;
       border-bottom: 1px solid var(--card-border);
       background: rgba(15, 23, 42, 0.6);
+      flex-wrap: wrap;
+      gap: 0.75rem;
     }
 
     .table-title {
@@ -718,8 +762,8 @@
       <div class="toggle-group">
         <span class="toggle-label" id="lblXAxis">Osa X (Grafy):</span>
         <div class="btn-segmented">
-          <button class="seg-btn active" id="btnXTime" onclick="setXAxis('time')">Čas</button>
-          <button class="seg-btn" id="btnXDist" onclick="setXAxis('distance')">Vzdálenost</button>
+          <button class="seg-btn" id="btnXTime" onclick="setXAxis('time')">Čas</button>
+          <button class="seg-btn active" id="btnXDist" onclick="setXAxis('distance')">Vzdálenost</button>
         </div>
       </div>
 
@@ -736,6 +780,14 @@
         <div class="btn-segmented">
           <button class="seg-btn active" id="btnHRBpm" onclick="setHRMode('bpm')">Tepy (t/min)</button>
           <button class="seg-btn" id="btnHRPercent" onclick="setHRMode('percent')">% z Max HR</button>
+        </div>
+      </div>
+
+      <div class="toggle-group">
+        <span class="toggle-label" id="lblAlignMode">Sladění startu:</span>
+        <div class="btn-segmented">
+          <button class="seg-btn active" id="btnAlignCommon" onclick="setAlignMode(true)">1. společný bod</button>
+          <button class="seg-btn" id="btnAlignAbs" onclick="setAlignMode(false)">Absolutní</button>
         </div>
       </div>
     </div>
@@ -821,71 +873,95 @@
 
       </div>
 
-      <!-- Main Panel: Map, Charts & Comparison Matrix -->
+      <!-- Main Panel: Map, 6 Charts Grid & Comparison Matrix -->
       <div class="dashboard-main">
 
         <!-- Leaflet Map Card -->
-        <div class="map-card">
+        <div class="map-card card-fullscreen-target" id="cardMap">
           <div class="map-header">
             <span id="mapTitle">Srovnávací mapa tras</span>
-            <span id="mapLegendSummary" style="font-size: 0.8rem; font-weight: 500; color: var(--text-muted);"></span>
+            <div style="display:flex; align-items:center; gap:0.75rem;">
+              <span id="mapLegendSummary" style="font-size: 0.8rem; font-weight: 500; color: var(--text-muted);"></span>
+              <button class="btn-fullscreen" onclick="toggleFullscreen('cardMap')">⛶ Celá obrazovka</button>
+            </div>
           </div>
           <div id="map"></div>
         </div>
 
-        <!-- Charts Grid (4 synchronized charts) -->
+        <!-- Charts Grid (6 synchronized charts) -->
         <div class="charts-grid">
           
-          <div class="chart-card">
-            <div class="chart-title" id="titleAltChart">
-              <span style="color: #34d399;">●</span> Nadmořská výška (m)
+          <!-- Chart 1: Altitude -->
+          <div class="chart-card card-fullscreen-target" id="cardChartAlt">
+            <div class="chart-header-row">
+              <div class="chart-title" id="titleAltChart"><span style="color: #34d399;">●</span> 1. Nadmořská výška (m)</div>
+              <button class="btn-fullscreen" onclick="toggleFullscreen('cardChartAlt')">⛶ Celá obrazovka</button>
             </div>
-            <div class="chart-wrapper">
-              <canvas id="chartAlt"></canvas>
-            </div>
+            <div class="chart-wrapper"><canvas id="chartAlt"></canvas></div>
           </div>
 
-          <div class="chart-card">
-            <div class="chart-title" id="titleSpeedChart">
-              <span style="color: #38bdf8;">●</span> Rychlost / Tempo
+          <!-- Chart 2: Speed / Pace -->
+          <div class="chart-card card-fullscreen-target" id="cardChartSpeed">
+            <div class="chart-header-row">
+              <div class="chart-title" id="titleSpeedChart"><span style="color: #38bdf8;">●</span> 2. Rychlost / Tempo</div>
+              <button class="btn-fullscreen" onclick="toggleFullscreen('cardChartSpeed')">⛶ Celá obrazovka</button>
             </div>
-            <div class="chart-wrapper">
-              <canvas id="chartSpeed"></canvas>
-            </div>
+            <div class="chart-wrapper"><canvas id="chartSpeed"></canvas></div>
           </div>
 
-          <div class="chart-card">
-            <div class="chart-title" id="titleHRChart">
-              <span style="color: #f43f5e;">●</span> Srdeční tep
+          <!-- Chart 3: Heart Rate -->
+          <div class="chart-card card-fullscreen-target" id="cardChartHR">
+            <div class="chart-header-row">
+              <div class="chart-title" id="titleHRChart"><span style="color: #f43f5e;">●</span> 3. Srdeční tep</div>
+              <button class="btn-fullscreen" onclick="toggleFullscreen('cardChartHR')">⛶ Celá obrazovka</button>
             </div>
-            <div class="chart-wrapper">
-              <canvas id="chartHR"></canvas>
-            </div>
+            <div class="chart-wrapper"><canvas id="chartHR"></canvas></div>
           </div>
 
-          <div class="chart-card">
-            <div class="chart-title" id="titleDiagChart">
-              <span style="color: #fbbf24;">●</span> Diagnostika baterie & GPS
+          <!-- Chart 4: GPS Signal Accuracy -->
+          <div class="chart-card card-fullscreen-target" id="cardChartGPS">
+            <div class="chart-header-row">
+              <div class="chart-title" id="titleGPSChart"><span style="color: #60a5fa;">●</span> 4. Přesnost & Kvalita GPS Signálu (ePE v m)</div>
+              <button class="btn-fullscreen" onclick="toggleFullscreen('cardChartGPS')">⛶ Celá obrazovka</button>
             </div>
-            <div class="chart-wrapper">
-              <canvas id="chartDiag"></canvas>
+            <div class="chart-wrapper"><canvas id="chartGPS"></canvas></div>
+          </div>
+
+          <!-- Chart 5: Battery Level Drop -->
+          <div class="chart-card card-fullscreen-target" id="cardChartBattery">
+            <div class="chart-header-row">
+              <div class="chart-title" id="titleBatteryChart"><span style="color: #fbbf24;">●</span> 5. Průběh Vybíjení Baterie (%)</div>
+              <button class="btn-fullscreen" onclick="toggleFullscreen('cardChartBattery')">⛶ Celá obrazovka</button>
             </div>
+            <div class="chart-wrapper"><canvas id="chartBattery"></canvas></div>
+          </div>
+
+          <!-- Chart 6: Ambient Temperature -->
+          <div class="chart-card card-fullscreen-target" id="cardChartTemp">
+            <div class="chart-header-row">
+              <div class="chart-title" id="titleTempChart"><span style="color: #2dd4bf;">●</span> 6. Teplota Okolí (°C)</div>
+              <button class="btn-fullscreen" onclick="toggleFullscreen('cardChartTemp')">⛶ Celá obrazovka</button>
+            </div>
+            <div class="chart-wrapper"><canvas id="chartTemp"></canvas></div>
           </div>
 
         </div>
 
         <!-- Metrics Comparison Table -->
-        <div class="table-card">
+        <div class="table-card card-fullscreen-target" id="cardTable">
           <div class="table-header-row">
             <div class="table-title" id="matrixTitle">Srovnávací matice aktivit</div>
-            <button class="btn-export" onclick="exportToExcel()">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="7 10 12 15 17 10"/>
-                <line x1="12" y1="15" x2="12" y2="3"/>
-              </svg>
-              <span id="btnExportText">Export do Excelu (.xlsx)</span>
-            </button>
+            <div style="display:flex; gap:0.6rem; align-items:center;">
+              <button class="btn-export" onclick="exportToExcel()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="7 10 12 15 17 10"/>
+                  <line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span id="btnExportText">Export do Excelu (.xlsx)</span>
+              </button>
+              <button class="btn-fullscreen" onclick="toggleFullscreen('cardTable')">⛶ Celá obrazovka</button>
+            </div>
           </div>
           <div class="table-responsive">
             <table class="compare-table" id="compareTable">
@@ -919,6 +995,9 @@
         lblHRMode: "Srdeční tep:",
         btnHRBpm: "Tepy (t/min)",
         btnHRPercent: "% z Max HR",
+        lblAlignMode: "Sladění startu:",
+        btnAlignCommon: "1. společný bod",
+        btnAlignAbs: "Absolutní",
         dropzoneTitle: "Přetáhněte sem .FIT soubory nebo celou složku",
         dropzoneSubtitle: "Podporováno je přetažení souborů i složek s podadresáři (např. /Vasek/, /Manzelka/)",
         btnSelectFiles: "Vybrat .FIT soubory",
@@ -926,33 +1005,34 @@
         titleSuggested: "Navržené dvojice & skupiny",
         titleFileList: "Vyberte 2 až 5 aktivit",
         mapTitle: "Srovnávací mapa tras",
-        titleAltChart: "Nadmořská výška (m)",
-        titleSpeedChart: "Rychlost / Tempo",
-        titleHRChart: "Srdeční tep",
-        titleDiagChart: "Diagnostika baterie & GPS",
+        titleAltChart: "1. Nadmořská výška (m)",
+        titleSpeedChart: "2. Rychlost / Tempo",
+        titleHRChart: "3. Srdeční tep",
+        titleGPSChart: "4. Přesnost & Kvalita GPS Signálu (ePE v m)",
+        titleBatteryChart: "5. Průběh Vybíjení Baterie (%)",
+        titleTempChart: "6. Teplota Okolí (°C)",
         matrixTitle: "Srovnávací matice aktivit",
         btnExportText: "Export do Excelu (.xlsx)",
         statusProcessing: "Zpracovávám soubory ({progress}/{total})...",
         statusDone: "Úspěšně načteno {count} FIT aktivit.",
         scenarioATitle: "Společná aktivita",
         scenarioBTitle: "Opakovaná trasa",
-        metricUser: "Uživatel / Složka",
-        metricDevice: "Zařízení & Model",
+        metricUser: "Uživatel / Název souboru",
+        metricDevice: "Zařízení & Přesný Model",
         metricFW: "Verze SW & Sériové č.",
         metricSensors: "Zdroje dat & Snímače",
         metricRecordFreq: "Frekvence záznamu",
         metricPointDensity: "Hustota GPS bodů",
         metricDistance: "Celková vzdálenost",
         metricDuration: "Čas (Uplynulý / Pohyb)",
-        metricAvgSpeed: "Průměrná rychlost",
-        metricAvgPace: "Průměrné tempo",
+        metricAvgSpeed: "Průměrná rychlost pohybu",
+        metricAvgPace: "Průměrné tempo pohybu",
         metricMaxSpeed: "Maximální rychlost",
         metricAscent: "Celkový výstup / sestup",
         metricAltRange: "Min / Max nadmořská výška",
         metricAvgHR: "Průměrný ST",
         metricMaxHR: "Maximální ST",
         metricTemp: "Teplota okolí (Zdroj)",
-        metricBattery: "Pokles baterie",
         sensorTempe: "Garmin Tempe (Externí teploměr)",
         sensorSpeed: "Garmin Snímač Rychlosti Kola",
         sensorOHR: "Integrovaný Optický Snímač ST",
@@ -973,6 +1053,9 @@
         lblHRMode: "Heart Rate:",
         btnHRBpm: "BPM (bpm)",
         btnHRPercent: "% of Max HR",
+        lblAlignMode: "Start Alignment:",
+        btnAlignCommon: "1st Common Point",
+        btnAlignAbs: "Absolute",
         dropzoneTitle: "Drag & drop .FIT files or whole folders here",
         dropzoneSubtitle: "Supports dragging files and folder trees with subdirectories (e.g. /Vasek/, /Wife/)",
         btnSelectFiles: "Select .FIT Files",
@@ -980,33 +1063,34 @@
         titleSuggested: "Suggested Pairs & Groups",
         titleFileList: "Select 2 to 5 Activities",
         mapTitle: "Comparative Track Map",
-        titleAltChart: "Elevation Profile (m)",
-        titleSpeedChart: "Speed / Pace",
-        titleHRChart: "Heart Rate",
-        titleDiagChart: "Battery & GPS Diagnostics",
+        titleAltChart: "1. Elevation Profile (m)",
+        titleSpeedChart: "2. Speed / Pace",
+        titleHRChart: "3. Heart Rate",
+        titleGPSChart: "4. GPS Signal Accuracy (ePE in m)",
+        titleBatteryChart: "5. Battery Discharge Rate (%)",
+        titleTempChart: "6. Ambient Temperature (°C)",
         matrixTitle: "Activity Comparison Matrix",
         btnExportText: "Export to Excel (.xlsx)",
         statusProcessing: "Processing files ({progress}/{total})...",
         statusDone: "Successfully loaded {count} FIT activities.",
         scenarioATitle: "Co-Activity",
         scenarioBTitle: "Route Repeat",
-        metricUser: "User / Folder",
-        metricDevice: "Device & Model",
+        metricUser: "User / File Name",
+        metricDevice: "Device & Exact Model",
         metricFW: "SW Version & Serial No.",
         metricSensors: "Data Sources & Sensors",
         metricRecordFreq: "Recording Frequency",
         metricPointDensity: "GPS Point Density",
         metricDistance: "Total Distance",
         metricDuration: "Duration (Total / Moving)",
-        metricAvgSpeed: "Avg Speed",
-        metricAvgPace: "Avg Pace",
+        metricAvgSpeed: "Avg Moving Speed",
+        metricAvgPace: "Avg Moving Pace",
         metricMaxSpeed: "Max Speed",
         metricAscent: "Total Ascent / Descent",
         metricAltRange: "Min / Max Altitude",
         metricAvgHR: "Avg HR",
         metricMaxHR: "Max HR",
         metricTemp: "Ambient Temp (Source)",
-        metricBattery: "Battery Drop",
         sensorTempe: "Garmin Tempe (External Temp)",
         sensorSpeed: "Garmin Bike Speed Sensor",
         sensorOHR: "Integrated Optical Wrist HR",
@@ -1019,9 +1103,10 @@
 
     // --- State Variables ---
     let currentLang = 'cz';
-    let xAxisMode = 'time'; // 'time' or 'distance'
-    let speedMode = 'speed'; // 'speed' or 'pace'
-    let hrMode = 'bpm'; // 'bpm' or 'percent'
+    let xAxisMode = 'distance'; // Default X-Axis: Distance
+    let speedMode = 'speed';   // Default Speed/Pace Mode: Speed
+    let hrMode = 'bpm';
+    let alignCommonPoint = true; // Default Start Alignment: 1st common waypoint
     
     let allActivities = [];
     let selectedIndices = [];
@@ -1029,7 +1114,7 @@
 
     const TRACK_COLORS = ['#38bdf8', '#c084fc', '#34d399', '#fbbf24', '#f43f5e'];
 
-    // Map & Charts references
+    // Map & 6 Charts references
     let map = null;
     let mapPolylineGroup = null;
     let mapMarkerGroup = null;
@@ -1038,26 +1123,41 @@
     let chartAlt = null;
     let chartSpeed = null;
     let chartHR = null;
-    let chartDiag = null;
+    let chartGPS = null;
+    let chartBattery = null;
+    let chartTemp = null;
 
     // --- Garmin Product ID Mapping ---
     const GARMIN_PRODUCTS = {
-      3907: "Garmin Quatix 7 / Fēnix 7 Sapphire Solar",
-      4374: "Garmin Fēnix 7 Pro / Solar",
+      3907: "Garmin Quatix 7X Sapphire Solar",
+      4374: "Garmin Fēnix 7S Solar",
       3843: "Garmin Fēnix 7 Standard",
       4125: "Garmin Forerunner 255",
-      3589: "Garmin Venu 2/3",
+      3589: "Garmin Venu 3",
       4105: "Garmin Epix Gen 2",
       3638: "Garmin Edge 1040"
     };
 
     function getDeviceName(productID, manufacturerID) {
       if (GARMIN_PRODUCTS[productID]) return GARMIN_PRODUCTS[productID];
-      if (manufacturerID === 1) return `Garmin Device (Model ID ${productID || 'N/A'})`;
+      if (manufacturerID === 1) return `Garmin Watch (Product ${productID || 'N/A'})`;
       return `Sports Device (${productID || 'Generic'})`;
     }
 
-    // --- UI Language & Controls Toggles ---
+    // --- UI Controls & Fullscreen ---
+    function toggleFullscreen(elementId) {
+      const elem = document.getElementById(elementId);
+      if (!elem) return;
+      elem.classList.toggle('is-fullscreen');
+
+      setTimeout(() => {
+        if (map) map.invalidateSize();
+        [chartAlt, chartSpeed, chartHR, chartGPS, chartBattery, chartTemp].forEach(c => {
+          if (c) c.resize();
+        });
+      }, 100);
+    }
+
     function setLanguage(lang) {
       currentLang = lang;
       document.getElementById('btnCZ').classList.toggle('active', lang === 'cz');
@@ -1075,6 +1175,9 @@
       document.getElementById('lblHRMode').innerText = t.lblHRMode;
       document.getElementById('btnHRBpm').innerText = t.btnHRBpm;
       document.getElementById('btnHRPercent').innerText = t.btnHRPercent;
+      document.getElementById('lblAlignMode').innerText = t.lblAlignMode;
+      document.getElementById('btnAlignCommon').innerText = t.btnAlignCommon;
+      document.getElementById('btnAlignAbs').innerText = t.btnAlignAbs;
       document.getElementById('dropzoneTitle').innerText = t.dropzoneTitle;
       document.getElementById('dropzoneSubtitle').innerText = t.dropzoneSubtitle;
       document.getElementById('btnSelectFiles').innerText = t.btnSelectFiles;
@@ -1115,6 +1218,13 @@
       if (selectedIndices.length > 0) updateCharts();
     }
 
+    function setAlignMode(enableCommon) {
+      alignCommonPoint = enableCommon;
+      document.getElementById('btnAlignCommon').classList.toggle('active', enableCommon);
+      document.getElementById('btnAlignAbs').classList.toggle('active', !enableCommon);
+      if (selectedIndices.length > 0) updateCharts();
+    }
+
     // --- Haversine Distance Calculation ---
     function haversineDistance(lat1, lon1, lat2, lon2) {
       const R = 6371000;
@@ -1126,7 +1236,19 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
-    // --- Native Binary FIT Parser (Fallback Engine) ---
+    // --- Format Duration helper ---
+    function formatDuration(seconds) {
+      if (!seconds || seconds <= 0) return "0:00";
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = Math.floor(seconds % 60);
+      if (h > 0) {
+        return `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+      }
+      return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    // --- Robust Dual FIT Parser with Endianness & Enhanced Fields ---
     function parseFitNative(arrayBuffer, filePathName) {
       try {
         const data = new Uint8Array(arrayBuffer);
@@ -1144,7 +1266,9 @@
         let idx = headerSize;
         while (idx < bodyEnd) {
           const hdr = data[idx++];
-          if ((hdr & 0x80) === 0) {
+          const isCompressed = (hdr & 0x80) !== 0;
+
+          if (!isCompressed) {
             const localMsgType = hdr & 0x0F;
             const isDef = (hdr & 0x40) !== 0;
             const hasDev = (hdr & 0x20) !== 0;
@@ -1152,7 +1276,9 @@
             if (isDef) {
               if (idx + 5 > bodyEnd) break;
               const arch = data[idx + 1];
-              const globalMsgNum = view.getUint16(idx + 2, arch === 0);
+              idx += 1;
+              const isLittle = (arch === 0);
+              const gNum = view.getUint16(idx + 1, isLittle);
               idx += 4;
               const numFields = data[idx++];
               const fields = [];
@@ -1171,7 +1297,7 @@
                   idx += 3;
                 }
               }
-              defs[localMsgType] = { globalMsgNum, isLittle: (arch === 0), fields, devFields };
+              defs[localMsgType] = { gNum, isLittle, fields, devFields };
             } else {
               const def = defs[localMsgType];
               if (!def) break;
@@ -1186,7 +1312,7 @@
                 for (const df of def.devFields) idx += df.size;
               }
 
-              const gNum = def.globalMsgNum;
+              const gNum = def.gNum;
               if (gNum === 0) { // file_id
                 for (const fNum in msgData) {
                   const { raw, size } = msgData[fNum];
@@ -1217,14 +1343,19 @@
                   if (fNum == 253 && size === 4) rec.timestamp = new Date((dv.getUint32(0, isLittle) + 631065600) * 1000);
                   else if (fNum == 0 && size === 4) rec.lat = dv.getInt32(0, isLittle) * (180.0 / 2147483648.0);
                   else if (fNum == 1 && size === 4) rec.lng = dv.getInt32(0, isLittle) * (180.0 / 2147483648.0);
-                  else if (fNum == 2 && size === 2) rec.alt = dv.getUint16(0, isLittle) / 5.0 - 500.0;
+                  else if (fNum == 78 && size === 4) rec.alt = dv.getUint32(0, isLittle) / 5.0 - 500.0;
+                  else if (fNum == 2 && size === 2 && rec.alt === undefined) rec.alt = dv.getUint16(0, isLittle) / 5.0 - 500.0;
                   else if (fNum == 3 && size === 1) rec.hr = raw[0];
                   else if (fNum == 4 && size === 1) rec.cadence = raw[0];
-                  else if (fNum == 6 && size === 2) rec.speed = dv.getUint16(0, isLittle) / 1000.0;
+                  else if (fNum == 73 && size === 4) rec.speed = dv.getUint32(0, isLittle) / 1000.0;
+                  else if (fNum == 6 && size === 2 && rec.speed === undefined) rec.speed = dv.getUint16(0, isLittle) / 1000.0;
+                  else if ((fNum == 5 || fNum == 77) && size === 4) rec.dist = dv.getUint32(0, isLittle) / 100.0;
                   else if (fNum == 7 && size === 2) rec.power = dv.getUint16(0, isLittle);
                   else if (fNum == 13 && size === 1) rec.temp = dv.getInt8(0);
+                  else if (fNum == 90 && size === 1) rec.battery = raw[0];
+                  else if (fNum == 61 && size === 2) rec.epe = dv.getUint16(0, isLittle) / 100.0;
                 }
-                if (rec.lat && rec.lng) records.append ? records.append(rec) : records.push(rec);
+                if (rec.lat && rec.lng) records.push(rec);
               }
             }
           } else {
@@ -1238,34 +1369,37 @@
 
         if (records.length === 0) return null;
 
-        // Process analytical metrics
-        let totalDist = 0;
+        // Process analytical metrics & cumulative Haversine distance
+        let calcDist = 0;
         let asc = 0, desc = 0;
         let activeSec = 0;
 
         for (let i = 0; i < records.length; i++) {
           if (i === 0) {
-            records[i].dist = 0;
+            if (records[i].dist === undefined) records[i].dist = 0;
             records[i].elapsedSec = 0;
           } else {
             const prev = records[i - 1];
             const curr = records[i];
             const stepDist = haversineDistance(prev.lat, prev.lng, curr.lat, curr.lng);
-            totalDist += stepDist;
-            curr.dist = totalDist;
+            calcDist += stepDist;
+            if (curr.dist === undefined) curr.dist = calcDist;
 
             const timeDelta = (curr.timestamp - prev.timestamp) / 1000;
             curr.elapsedSec = prev.elapsedSec + (timeDelta > 0 ? timeDelta : 1);
 
-            if (curr.speed > 0.5) activeSec += (timeDelta > 0 ? timeDelta : 1);
+            // Active moving detection: speed > 0.3 m/s (~1 km/h)
+            if ((curr.speed || 0) > 0.3) activeSec += (timeDelta > 0 ? timeDelta : 1);
 
             if (curr.alt !== undefined && prev.alt !== undefined) {
               const diff = curr.alt - prev.alt;
-              if (diff > 0) asc += diff;
-              else desc += Math.abs(diff);
+              if (diff > 0 && diff < 10) asc += diff;
+              else if (diff < 0 && Math.abs(diff) < 10) desc += Math.abs(diff);
             }
           }
         }
+
+        const finalDistKm = (records[records.length - 1].dist || calcDist) / 1000.0;
 
         // Sampling frequency & Smart Recording analysis
         const deltas = [];
@@ -1278,16 +1412,18 @@
         const percent1s = deltas.length > 0 ? (onesCount / deltas.length * 100) : 100;
         const is1sRecording = percent1s >= 95;
 
-        // Extract user/folder tag
-        let userTag = "User";
-        if (filePathName.includes('/')) {
-          const parts = filePathName.split('/');
-          if (parts.length > 1 && parts[parts.length - 2]) userTag = parts[parts.length - 2];
-        } else if (filePathName.includes('\\')) {
-          const parts = filePathName.split('\\');
-          if (parts.length > 1 && parts[parts.length - 2]) userTag = parts[parts.length - 2];
+        // Clean user/folder tag
+        let userTag = "Quatix";
+        const cleanName = filePathName.split(/[/\\]/).pop().replace(/\.fit$/i, '');
+        if (filePathName.includes('/') || filePathName.includes('\\')) {
+          const parts = filePathName.split(/[/\\]/);
+          if (parts.length > 1 && parts[parts.length - 2] && parts[parts.length - 2] !== '.' && parts[parts.length - 2].toLowerCase() !== 'comparer') {
+            userTag = parts[parts.length - 2];
+          } else {
+            userTag = cleanName.split('_')[0];
+          }
         } else {
-          userTag = filePathName.replace(/\.fit$/i, '');
+          userTag = cleanName.split('_')[0];
         }
 
         // External Sensors Detection
@@ -1295,7 +1431,7 @@
         const hasSpeedSensor = deviceInfos.some(d => d.deviceType === 123 || d.antplusDeviceType === 123 || d.deviceType === 1);
 
         return {
-          filename: filePathName.split(/[/\\]/).pop(),
+          filename: cleanName + '.fit',
           user: userTag,
           productID: fileId.product,
           manufacturerID: fileId.manufacturer,
@@ -1303,16 +1439,16 @@
           serialNumber: fileId.serialNumber || 'N/A',
           swVersion: deviceInfos[0]?.softwareVersion || 'N/A',
           records: records,
-          totalDistance: totalDist / 1000.0, // km
+          totalDistance: finalDistKm,
           elapsedSec: records[records.length - 1].elapsedSec,
-          activeSec: activeSec,
+          activeSec: activeSec > 0 ? activeSec : (records[records.length - 1].elapsedSec * 0.85),
           ascent: asc,
           descent: desc,
           avgIntervalSec: avgInterval,
           percent1s: percent1s,
           is1sRecording: is1sRecording,
           gpsPointsCount: records.length,
-          pointDensityPerKm: (records.length / (totalDist / 1000.0)).toFixed(0),
+          pointDensityPerKm: (records.length / finalDistKm).toFixed(0),
           hasTempeSensor: hasTempe,
           hasSpeedSensor: hasSpeedSensor,
           deviceInfos: deviceInfos
@@ -1323,7 +1459,7 @@
       }
     }
 
-    // --- File Drag & Drop & Input Select Handler ---
+    // --- File Drag & Drop & Selection Handler ---
     async function processFileListWithPaths(fileEntries) {
       if (fileEntries.length === 0) return;
 
@@ -1359,7 +1495,6 @@
       statusCheck.style.display = 'flex';
       statusText.innerText = i18n[currentLang].statusDone.replace('{count}', allActivities.length);
 
-      // Run Automatic Pairing Algorithm
       computeMatchingGroups();
 
       // Default selection: select up to first 3 activities
@@ -1377,7 +1512,7 @@
       await processFileListWithPaths(entries);
     }
 
-    // --- HTML5 Drag and Drop Event Handling ---
+    // Drag and Drop
     window.addEventListener('dragover', (e) => e.preventDefault());
     window.addEventListener('drop', (e) => e.preventDefault());
 
@@ -1412,7 +1547,6 @@
         }
       }
 
-      // Fallback for standard files array if webkitGetAsEntry didn't catch files
       if (fileEntries.length === 0 && e.dataTransfer.files) {
         Array.from(e.dataTransfer.files).forEach(f => {
           if (f.name.toLowerCase().endsWith('.fit')) {
@@ -1447,14 +1581,13 @@
     function computeMatchingGroups() {
       suggestedGroups = [];
 
-      // Scenario A: Co-activities (Different users, overlapping start time ±15 min, similar duration)
       for (let i = 0; i < allActivities.length; i++) {
         for (let j = i + 1; j < allActivities.length; j++) {
           const a1 = allActivities[i];
           const a2 = allActivities[j];
 
           if (a1.user !== a2.user && a1.records[0] && a2.records[0]) {
-            const timeDiff = Math.abs((a1.records[0].timestamp - a2.records[0].timestamp) / 1000); // seconds
+            const timeDiff = Math.abs((a1.records[0].timestamp - a2.records[0].timestamp) / 1000);
             const durationRatio = a1.elapsedSec / (a2.elapsedSec || 1);
 
             if (timeDiff <= 900 && durationRatio >= 0.7 && durationRatio <= 1.3) {
@@ -1469,7 +1602,6 @@
         }
       }
 
-      // Scenario B: Route Repeats (Same user/device, different dates, start/finish within 100m)
       for (let i = 0; i < allActivities.length; i++) {
         for (let j = i + 1; j < allActivities.length; j++) {
           const a1 = allActivities[i];
@@ -1523,7 +1655,6 @@
         });
       }
 
-      // Render File Checkbox List
       const listContainer = document.getElementById('fileListContainer');
       listContainer.innerHTML = '';
 
@@ -1542,8 +1673,8 @@
           <input type="checkbox" class="file-checkbox" ${isSel ? 'checked' : ''} onchange="toggleActivitySelection(${idx})">
           <div class="color-dot" style="background: ${color}; border: ${isSel ? 'none' : '1px solid var(--text-muted)'};"></div>
           <div class="file-info">
-            <div class="file-title">${act.user} &bull; ${act.filename}</div>
-            <div class="file-meta">${act.deviceName} &bull; ${act.totalDistance.toFixed(1)} km &bull; ${act.records[0]?.timestamp?.toLocaleDateString() || ''}</div>
+            <div class="file-title">${act.user} &bull; ${act.deviceName}</div>
+            <div class="file-meta">${act.filename} &bull; ${act.totalDistance.toFixed(1)} km &bull; ${act.records[0]?.timestamp?.toLocaleDateString() || ''}</div>
           </div>
         `;
         listContainer.appendChild(item);
@@ -1564,14 +1695,46 @@
       renderDashboard();
     }
 
-    // --- Main Dashboard Rendering (Map, Charts & Table) ---
+    // --- First Common Passage Point Alignment Algorithm ---
+    function calculateCommonPassageOffsets(activeActs) {
+      const offsets = activeActs.map(() => ({ distOffset: 0, timeOffsetSec: 0 }));
+      if (!alignCommonPoint || activeActs.length < 2) return offsets;
+
+      const baseAct = activeActs[0];
+      if (!baseAct.records || baseAct.records.length === 0) return offsets;
+
+      for (let k = 1; k < activeActs.length; k++) {
+        const targetAct = activeActs[k];
+        let found = false;
+
+        for (let i = 0; i < Math.min(200, baseAct.records.length); i++) {
+          const bPt = baseAct.records[i];
+          for (let j = 0; j < Math.min(200, targetAct.records.length); j++) {
+            const tPt = targetAct.records[j];
+            const d = haversineDistance(bPt.lat, bPt.lng, tPt.lat, tPt.lng);
+            if (d <= 50) { // within 50m common waypoint
+              offsets[k] = {
+                distOffset: (tPt.dist || 0) / 1000.0 - (bPt.dist || 0) / 1000.0,
+                timeOffsetSec: (tPt.elapsedSec || 0) - (bPt.elapsedSec || 0)
+              };
+              found = true;
+              break;
+            }
+          }
+          if (found) break;
+        }
+      }
+      return offsets;
+    }
+
+    // --- Main Dashboard Rendering ---
     function renderDashboard() {
       renderMap();
       updateCharts();
       renderTable();
     }
 
-    // --- Synchronized Map Rendering ---
+    // --- Map Rendering ---
     function renderMap() {
       if (!map) {
         map = L.map('map').setView([50.0755, 14.4378], 10);
@@ -1602,14 +1765,12 @@
 
           latLngs.forEach(ll => bounds.extend(ll));
 
-          // Start & Finish Markers
           const startPt = latLngs[0];
           const endPt = latLngs[latLngs.length - 1];
 
           mapMarkerGroup.addLayer(L.circleMarker(startPt, { radius: 6, color: '#10b981', fillColor: '#059669', fillOpacity: 1 }));
           mapMarkerGroup.addLayer(L.circleMarker(endPt, { radius: 6, color: '#ef4444', fillColor: '#dc2626', fillOpacity: 1 }));
 
-          // Live Crosshair Marker for chart sync
           const crosshair = L.circleMarker(startPt, {
             radius: 8,
             color: '#ffffff',
@@ -1632,59 +1793,65 @@
       document.getElementById('mapLegendSummary').innerHTML = legendSummary;
     }
 
-    // --- Chart.js Multi-Grid with Crosshair Synchronization ---
+    // --- 6 Synchronized Charts Grid ---
     function updateCharts() {
       if (selectedIndices.length === 0) return;
 
       const activeActs = selectedIndices.map(i => allActivities[i]);
+      const offsets = calculateCommonPassageOffsets(activeActs);
 
-      // Prepare Datasets for 4 Charts
-      const altDatasets = [];
-      const speedDatasets = [];
-      const hrDatasets = [];
-      const diagDatasets = [];
+      const altDs = [], speedDs = [], hrDs = [], gpsDs = [], battDs = [], tempDs = [];
 
       activeActs.forEach((act, colorIdx) => {
         const color = TRACK_COLORS[colorIdx % TRACK_COLORS.length];
         const label = `${act.user} (${act.deviceName})`;
 
-        const dataAlt = [];
-        const dataSpeed = [];
-        const dataHR = [];
-        const dataDiag = [];
+        const dataAlt = [], dataSpeed = [], dataHR = [], dataGPS = [], dataBatt = [], dataTemp = [];
+        const { distOffset, timeOffsetSec } = offsets[colorIdx];
 
         act.records.forEach(r => {
-          const xVal = xAxisMode === 'time' ? (r.elapsedSec / 60.0) : r.dist / 1000.0;
+          let xVal = xAxisMode === 'time'
+            ? ((r.elapsedSec - timeOffsetSec) / 60.0)
+            : ((r.dist / 1000.0) - distOffset);
 
-          // Altitude
+          if (xVal < 0) xVal = 0;
+
+          // 1. Altitude
           dataAlt.push({ x: xVal, y: r.alt !== undefined ? r.alt : null });
 
-          // Speed / Pace
+          // 2. Speed / Pace
           let spdVal = null;
           if (r.speed !== undefined) {
-            if (speedMode === 'speed') spdVal = (r.speed * 3.6); // km/h
-            else spdVal = r.speed > 0.3 ? (1000.0 / (r.speed * 60.0)) : null; // min/km
+            if (speedMode === 'speed') spdVal = (r.speed * 3.6);
+            else spdVal = r.speed > 0.3 ? (1000.0 / (r.speed * 60.0)) : null;
           }
           dataSpeed.push({ x: xVal, y: spdVal });
 
-          // HR
+          // 3. HR
           let hrVal = null;
           if (r.hr !== undefined) {
-            hrVal = hrMode === 'bpm' ? r.hr : (r.hr / 190.0 * 100.0); // % z max
+            hrVal = hrMode === 'bpm' ? r.hr : (r.hr / 190.0 * 100.0);
           }
           dataHR.push({ x: xVal, y: hrVal });
 
-          // Temp / Battery / GPS Accuracy (Diag)
-          dataDiag.push({ x: xVal, y: r.temp !== undefined ? r.temp : null });
+          // 4. GPS Accuracy / ePE
+          dataGPS.push({ x: xVal, y: r.epe !== undefined ? r.epe : null });
+
+          // 5. Battery Level %
+          dataBatt.push({ x: xVal, y: r.battery !== undefined ? r.battery : null });
+
+          // 6. Temperature
+          dataTemp.push({ x: xVal, y: r.temp !== undefined ? r.temp : null });
         });
 
-        altDatasets.push({ label, data: dataAlt, borderColor: color, backgroundColor: color + '22', fill: true, borderWidth: 2, pointRadius: 0 });
-        speedDatasets.push({ label, data: dataSpeed, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
-        hrDatasets.push({ label, data: dataHR, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
-        diagDatasets.push({ label, data: dataDiag, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
+        altDs.push({ label, data: dataAlt, borderColor: color, backgroundColor: color + '22', fill: true, borderWidth: 2, pointRadius: 0 });
+        speedDs.push({ label, data: dataSpeed, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
+        hrDs.push({ label, data: dataHR, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
+        gpsDs.push({ label, data: dataGPS, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
+        battDs.push({ label, data: dataBatt, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0, tension: 0.3 });
+        tempDs.push({ label, data: dataTemp, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0, tension: 0.3 });
       });
 
-      // Chart Config Generator
       const xTitle = xAxisMode === 'time' ? 'Čas (min)' : 'Vzdálenost (km)';
 
       function createChartConfig(datasets, yTitle) {
@@ -1718,15 +1885,14 @@
         };
       }
 
-      if (chartAlt) chartAlt.destroy();
-      if (chartSpeed) chartSpeed.destroy();
-      if (chartHR) chartHR.destroy();
-      if (chartDiag) chartDiag.destroy();
+      [chartAlt, chartSpeed, chartHR, chartGPS, chartBattery, chartTemp].forEach(c => { if (c) c.destroy(); });
 
-      chartAlt = new Chart(document.getElementById('chartAlt'), createChartConfig(altDatasets, 'Nadmořská výška (m)'));
-      chartSpeed = new Chart(document.getElementById('chartSpeed'), createChartConfig(speedDatasets, speedMode === 'speed' ? 'Rychlost (km/h)' : 'Tempo (min/km)'));
-      chartHR = new Chart(document.getElementById('chartHR'), createChartConfig(hrDatasets, hrMode === 'bpm' ? 'Tepy (t/min)' : '% z Max HR'));
-      chartDiag = new Chart(document.getElementById('chartDiag'), createChartConfig(diagDatasets, 'Teplota okolí (°C)'));
+      chartAlt = new Chart(document.getElementById('chartAlt'), createChartConfig(altDs, 'Nadmořská výška (m)'));
+      chartSpeed = new Chart(document.getElementById('chartSpeed'), createChartConfig(speedDs, speedMode === 'speed' ? 'Rychlost (km/h)' : 'Tempo (min/km)'));
+      chartHR = new Chart(document.getElementById('chartHR'), createChartConfig(hrDs, hrMode === 'bpm' ? 'Tepy (t/min)' : '% z Max HR'));
+      chartGPS = new Chart(document.getElementById('chartGPS'), createChartConfig(gpsDs, 'Přesnost GPS ePE (m)'));
+      chartBattery = new Chart(document.getElementById('chartBattery'), createChartConfig(battDs, 'Stav Baterie (%)'));
+      chartTemp = new Chart(document.getElementById('chartTemp'), createChartConfig(tempDs, 'Teplota OKolí (°C)'));
     }
 
     function updateMapCrosshair(pointIndex) {
@@ -1749,7 +1915,6 @@
 
       const activeActs = selectedIndices.map(i => allActivities[i]);
 
-      // Table Header Row
       let html = `<thead><tr><th>Metrika / Vlastnost</th>`;
       activeActs.forEach((act, colorIdx) => {
         const color = TRACK_COLORS[colorIdx % TRACK_COLORS.length];
@@ -1757,15 +1922,14 @@
       });
       html += `</tr></thead><tbody>`;
 
-      // Helper function to generate table rows
       function addRow(label, values) {
         html += `<tr><td><strong>${label}</strong></td>`;
         values.forEach(v => { html += `<td>${v}</td>`; });
         html += `</tr>`;
       }
 
-      addRow(t.metricUser, activeActs.map(a => a.user));
-      addRow(t.metricDevice, activeActs.map(a => a.deviceName));
+      addRow(t.metricUser, activeActs.map(a => `${a.user} &bull; <small style="color:var(--text-muted);">${a.filename}</small>`));
+      addRow(t.metricDevice, activeActs.map(a => `<strong>${a.deviceName}</strong>`));
       addRow(t.metricFW, activeActs.map(a => `SW v${a.swVersion} (S/N: ${a.serialNumber})`));
 
       // External Data Sources & Sensors
@@ -1786,28 +1950,35 @@
 
       addRow(t.metricDistance, activeActs.map(a => `<strong>${a.totalDistance.toFixed(2)} km</strong>`));
 
-      // Durations
+      // Durations (Total / Moving)
       addRow(t.metricDuration, activeActs.map(a => {
-        const totMin = Math.floor(a.elapsedSec / 60);
-        const movMin = Math.floor(a.activeSec / 60);
-        return `${totMin} min (Pohyb: ${movMin} min)`;
+        const totFormatted = formatDuration(a.elapsedSec);
+        const movFormatted = formatDuration(a.activeSec);
+        return `<strong>${totFormatted}</strong> (Pohyb: ${movFormatted})`;
       }));
 
-      // Speed & Pace
+      // Average Moving Speed (vzdálenost / čas pohybu)
       addRow(t.metricAvgSpeed, activeActs.map(a => {
-        const avgSpd = (a.totalDistance / (a.elapsedSec / 3600.0)).toFixed(1);
-        return `<strong>${avgSpd} km/h</strong>`;
+        const movHours = (a.activeSec || a.elapsedSec) / 3600.0;
+        const avgMovSpd = movHours > 0 ? (a.totalDistance / movHours).toFixed(1) : "0.0";
+        return `<strong>${avgMovSpd} km/h</strong>`;
       }));
 
+      // Average Moving Pace
       addRow(t.metricAvgPace, activeActs.map(a => {
-        const paceSec = (a.elapsedSec / a.totalDistance);
-        const pMin = Math.floor(paceSec / 60);
-        const pSec = Math.floor(paceSec % 60);
-        return `${pMin}:${pSec < 10 ? '0' : ''}${pSec} min/km`;
+        const movPaceSec = a.totalDistance > 0 ? ((a.activeSec || a.elapsedSec) / a.totalDistance) : 0;
+        return `<strong>${formatDuration(movPaceSec)} min/km</strong>`;
       }));
 
       // Elevation Gain / Loss
-      addRow(t.metricAscent, activeActs.map(a => `+${a.ascent.toFixed(0)} m / -${a.descent.toFixed(0)} m`));
+      addRow(t.metricAscent, activeActs.map(a => `<strong>+${a.ascent.toFixed(0)} m / -${a.descent.toFixed(0)} m</strong>`));
+
+      // Altitude Range
+      addRow(t.metricAltRange, activeActs.map(a => {
+        const alts = a.records.map(r => r.alt).filter(v => v !== undefined);
+        if (alts.length === 0) return 'N/A';
+        return `${Math.min(...alts).toFixed(0)} m / ${Math.max(...alts).toFixed(0)} m`;
+      }));
 
       // Temperature & Source
       addRow(t.metricTemp, activeActs.map(a => {
@@ -1829,20 +2000,22 @@
       const t = i18n[currentLang];
       const activeActs = selectedIndices.map(i => allActivities[i]);
 
-      // Sheet 1: Metrics Matrix Summary
       const matrixData = [];
       const headers = ["Metrika", ...activeActs.map(a => `${a.user} (${a.deviceName})`)];
       matrixData.push(headers);
 
       matrixData.push(["Uživatel / Složka", ...activeActs.map(a => a.user)]);
-      matrixData.push(["Zařízení & Model", ...activeActs.map(a => a.deviceName)]);
+      matrixData.push(["Zařízení & Přesný Model", ...activeActs.map(a => a.deviceName)]);
       matrixData.push(["SW Verze & Sériové č.", ...activeActs.map(a => `SW v${a.swVersion} (S/N: ${a.serialNumber})`)]);
       matrixData.push(["Režim Záznamu", ...activeActs.map(a => a.is1sRecording ? "1s Záznam" : "Chytrý záznam")]);
       matrixData.push(["Průměrný rozestup bodů", ...activeActs.map(a => `${a.avgIntervalSec.toFixed(2)}s`)]);
       matrixData.push(["Hustota GPS bodů", ...activeActs.map(a => `${a.gpsPointsCount} bodů (${a.pointDensityPerKm} bodů/km)`)]);
       matrixData.push(["Celková vzdálenost (km)", ...activeActs.map(a => a.totalDistance.toFixed(2))]);
-      matrixData.push(["Celkový čas (min)", ...activeActs.map(a => (a.elapsedSec / 60).toFixed(1))]);
+      matrixData.push(["Čas Uplynulý", ...activeActs.map(a => formatDuration(a.elapsedSec))]);
+      matrixData.push(["Čas Pohybu", ...activeActs.map(a => formatDuration(a.activeSec))]);
+      matrixData.push(["Průměrná rychlost pohybu (km/h)", ...activeActs.map(a => (a.totalDistance / (a.activeSec / 3600.0)).toFixed(1))]);
       matrixData.push(["Nastoupané metry (m)", ...activeActs.map(a => a.ascent.toFixed(0))]);
+      matrixData.push(["Sestoupané metry (m)", ...activeActs.map(a => a.descent.toFixed(0))]);
 
       const wsMatrix = XLSX.utils.aoa_to_sheet(matrixData);
       const wb = XLSX.utils.book_new();
