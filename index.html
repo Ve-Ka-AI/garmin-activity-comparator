@@ -1,0 +1,1754 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Garmin Activity Comparator</title>
+  <meta name="description" content="Pokročilé klientské porovnávání a analytická vizualizace více Garmin .fit aktivit najednou.">
+
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- SheetJS for Excel export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- Chart.js for synchronized charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- fit-parser CDN ES module loader fallback -->
+  <script type="module">
+    try {
+      import FitParser from 'https://cdn.jsdelivr.net/npm/fit-parser@1.9.0/+esm';
+      window.FitParser = FitParser;
+    } catch (e) {
+      console.warn("CDN FitParser loading warning, fallback native parser ready.", e);
+    }
+  </script>
+
+  <style>
+    :root {
+      --bg-dark: #090d16;
+      --card-bg: rgba(21, 32, 54, 0.75);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --card-border-glow: rgba(56, 189, 248, 0.3);
+      --primary: #38bdf8;
+      --primary-hover: #0284c7;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-purple: #c084fc;
+      --accent-green: #34d399;
+      --accent-amber: #fbbf24;
+      --accent-rose: #f43f5e;
+      --radius: 16px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg-dark);
+      background-image:
+        radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.12) 0px, transparent 45%),
+        radial-gradient(at 100% 0%, rgba(192, 132, 252, 0.1) 0px, transparent 45%),
+        radial-gradient(at 50% 100%, rgba(52, 211, 153, 0.08) 0px, transparent 50%);
+      background-attachment: fixed;
+      color: var(--text-main);
+      min-height: 100vh;
+      padding: 1.5rem 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1, h2, h3, h4, .font-heading {
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1440px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* Top Bar Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+      padding: 1rem 1.5rem;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    .brand-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(56, 189, 248, 0.4);
+    }
+
+    .brand-icon svg {
+      width: 26px;
+      height: 26px;
+      stroke: #ffffff;
+      fill: none;
+      stroke-width: 2.2;
+    }
+
+    h1 {
+      font-size: 1.45rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #ffffff, #93c5fd);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -0.02em;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .privacy-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      background: rgba(16, 185, 129, 0.15);
+      color: #6ee7b7;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 0.45rem 0.9rem;
+      border-radius: 9999px;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+
+    .lang-switcher {
+      display: flex;
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid var(--card-border);
+      border-radius: 9999px;
+      padding: 3px;
+    }
+
+    .lang-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      padding: 0.4rem 0.9rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .lang-btn.active {
+      background: linear-gradient(135deg, #38bdf8, #2563eb);
+      color: #ffffff;
+      box-shadow: 0 2px 8px rgba(56, 189, 248, 0.4);
+    }
+
+    /* Global Controls Toolbar */
+    .toolbar-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 0.85rem 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .toggle-group {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .toggle-label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .btn-segmented {
+      display: flex;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 3px;
+    }
+
+    .seg-btn {
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      padding: 0.4rem 0.85rem;
+      border-radius: 7px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .seg-btn.active {
+      background: rgba(56, 189, 248, 0.25);
+      color: var(--primary);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+    }
+
+    /* Dropzone */
+    .dropzone {
+      background: var(--card-bg);
+      backdrop-filter: blur(14px);
+      border: 2px dashed rgba(56, 189, 248, 0.4);
+      border-radius: var(--radius);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--primary);
+      background: rgba(56, 189, 248, 0.08);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 30px rgba(56, 189, 248, 0.2);
+    }
+
+    .dropzone input[type="file"] {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .cloud-icon {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 0.85rem;
+      background: rgba(56, 189, 248, 0.15);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+    }
+
+    .cloud-icon svg {
+      width: 32px;
+      height: 32px;
+      stroke-width: 2;
+    }
+
+    .dropzone-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 0.35rem;
+    }
+
+    .dropzone-subtitle {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Status Bar */
+    .status-bar {
+      display: none;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 1rem 1.5rem;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid rgba(56, 189, 248, 0.2);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .status-check {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: #10b981;
+    }
+
+    .status-text {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    /* Main Section Layout: Sidebar (340px) + Dashboard */
+    .dashboard-layout {
+      display: none;
+      grid-template-columns: 340px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    @media (max-width: 1024px) {
+      .dashboard-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Sidebar: Matching & File Selector */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+
+    .sidebar-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .sidebar-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding-bottom: 0.65rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .suggested-groups {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .group-item {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .group-item:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+      background: rgba(56, 189, 248, 0.08);
+    }
+
+    .group-item.scenario-a {
+      border-left: 4px solid var(--primary);
+    }
+
+    .group-item.scenario-b {
+      border-left: 4px solid var(--accent-purple);
+    }
+
+    .group-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 800;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+      margin-bottom: 0.35rem;
+    }
+
+    .badge-scenario-a {
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--primary);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+    }
+
+    .badge-scenario-b {
+      background: rgba(192, 132, 252, 0.2);
+      color: var(--accent-purple);
+      border: 1px solid rgba(192, 132, 252, 0.4);
+    }
+
+    .group-name {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .group-subtext {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+    }
+
+    /* File Checkbox List */
+    .file-list-container {
+      max-height: 380px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding-right: 4px;
+    }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 0.65rem 0.85rem;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .file-item:hover {
+      background: rgba(56, 189, 248, 0.06);
+    }
+
+    .file-item.selected {
+      border-color: var(--primary);
+      background: rgba(56, 189, 248, 0.12);
+    }
+
+    .file-checkbox {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    .color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .file-info {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .file-title {
+      font-size: 0.84rem;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    /* Main Dashboard Panel */
+    .dashboard-main {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* Map Card */
+    .map-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .map-header {
+      padding: 0.85rem 1.25rem;
+      font-size: 0.95rem;
+      font-weight: 700;
+      border-bottom: 1px solid var(--card-border);
+      background: rgba(15, 23, 42, 0.5);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #map {
+      height: 400px;
+      width: 100%;
+      z-index: 1;
+    }
+
+    /* Multi-Chart Grid */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+    }
+
+    @media (max-width: 900px) {
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chart-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      padding: 1.15rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .chart-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .chart-wrapper {
+      position: relative;
+      height: 220px;
+      width: 100%;
+    }
+
+    /* Comparison Table Card */
+    .table-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .table-header-row {
+      padding: 1rem 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--card-border);
+      background: rgba(15, 23, 42, 0.6);
+    }
+
+    .table-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    .btn-export {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      background: linear-gradient(135deg, #10b981, #059669);
+      color: #ffffff;
+      border: none;
+      padding: 0.55rem 1rem;
+      border-radius: 9px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-export:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(16, 185, 129, 0.45);
+    }
+
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    table.compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.85rem;
+    }
+
+    table.compare-table th {
+      background: rgba(15, 23, 42, 0.85);
+      color: var(--text-muted);
+      padding: 0.85rem 1rem;
+      font-weight: 700;
+      border-bottom: 1px solid var(--card-border);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    table.compare-table td {
+      padding: 0.8rem 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    table.compare-table tr:hover td {
+      background: rgba(56, 189, 248, 0.05);
+    }
+
+    .sensor-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--primary);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 0.2rem 0.55rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-right: 0.3rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .sensor-tempe {
+      background: rgba(251, 191, 36, 0.15);
+      color: var(--accent-amber);
+      border-color: rgba(251, 191, 36, 0.3);
+    }
+
+    .sensor-speed {
+      background: rgba(192, 132, 252, 0.15);
+      color: var(--accent-purple);
+      border-color: rgba(192, 132, 252, 0.3);
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 2rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <!-- Top Header -->
+    <header>
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M18 20V10M12 20V4M6 20v-6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <h1 id="appTitle">Garmin Activity Comparator</h1>
+      </div>
+
+      <div class="header-controls">
+        <div class="privacy-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <span id="privacyText">100% Lokální klientské zpracování (Browser-Only)</span>
+        </div>
+
+        <div class="lang-switcher">
+          <button class="lang-btn active" id="btnCZ" onclick="setLanguage('cz')">CZ</button>
+          <button class="lang-btn" id="btnEN" onclick="setLanguage('en')">EN</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Global Controls Toolbar -->
+    <div class="toolbar-card">
+      <div class="toggle-group">
+        <span class="toggle-label" id="lblXAxis">Osa X (Grafy):</span>
+        <div class="btn-segmented">
+          <button class="seg-btn active" id="btnXTime" onclick="setXAxis('time')">Čas</button>
+          <button class="seg-btn" id="btnXDist" onclick="setXAxis('distance')">Vzdálenost</button>
+        </div>
+      </div>
+
+      <div class="toggle-group">
+        <span class="toggle-label" id="lblSpeedMode">Rychlost / Tempo:</span>
+        <div class="btn-segmented">
+          <button class="seg-btn active" id="btnSpeed" onclick="setSpeedMode('speed')">Rychlost (km/h)</button>
+          <button class="seg-btn" id="btnPace" onclick="setSpeedMode('pace')">Tempo (min/km)</button>
+        </div>
+      </div>
+
+      <div class="toggle-group">
+        <span class="toggle-label" id="lblHRMode">Srdeční tep:</span>
+        <div class="btn-segmented">
+          <button class="seg-btn active" id="btnHRBpm" onclick="setHRMode('bpm')">Tepy (t/min)</button>
+          <button class="seg-btn" id="btnHRPercent" onclick="setHRMode('percent')">% z Max HR</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Upload Dropzone -->
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="fileInput" multiple webkitdirectory directory accept=".fit" onchange="handleFileSelect(event)">
+      <div class="cloud-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M16 16l-4-4-4 4M12 12v9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="dropzone-title" id="dropzoneTitle">Přetáhněte sem složky nebo .fit soubory (složky = jména uživatelů)</div>
+      <div class="dropzone-subtitle" id="dropzoneSubtitle">Podporovány jsou dávkové nahrávky složek s podadresáři (např. /Vasek/, /Manzelka/) i jednotlivé soubory</div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar" id="statusBar">
+      <div class="spinner" id="statusSpinner"></div>
+      <div class="status-check" id="statusCheck">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" stroke-linecap="round" stroke-linejoin="round"/>
+          <polyline points="22 4 12 14.01 9 11.01" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="status-text" id="statusText">Zpracovávám soubory...</div>
+    </div>
+
+    <!-- Main Dashboard Layout -->
+    <div class="dashboard-layout" id="dashboardLayout">
+
+      <!-- Left Sidebar: Matching Groups & Activity Selector -->
+      <div class="sidebar">
+        
+        <div class="sidebar-card">
+          <div class="sidebar-title" id="titleSuggested">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            <span>Navržené dvojice & skupiny</span>
+          </div>
+          <div class="suggested-groups" id="suggestedGroups">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+        <div class="sidebar-card">
+          <div class="sidebar-title" id="titleFileList">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span>Vyberte 2 až 5 aktivit</span>
+          </div>
+          <div class="file-list-container" id="fileListContainer">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Main Panel: Map, Charts & Comparison Matrix -->
+      <div class="dashboard-main">
+
+        <!-- Leaflet Map Card -->
+        <div class="map-card">
+          <div class="map-header">
+            <span id="mapTitle">Srovnávací mapa tras</span>
+            <span id="mapLegendSummary" style="font-size: 0.8rem; font-weight: 500; color: var(--text-muted);"></span>
+          </div>
+          <div id="map"></div>
+        </div>
+
+        <!-- Charts Grid (4 synchronized charts) -->
+        <div class="charts-grid">
+          
+          <div class="chart-card">
+            <div class="chart-title" id="titleAltChart">
+              <span style="color: #34d399;">●</span> Nadmořská výška (m)
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="chartAlt"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-title" id="titleSpeedChart">
+              <span style="color: #38bdf8;">●</span> Rychlost / Tempo
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="chartSpeed"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-title" id="titleHRChart">
+              <span style="color: #f43f5e;">●</span> Srdeční tep
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="chartHR"></canvas>
+            </div>
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-title" id="titleDiagChart">
+              <span style="color: #fbbf24;">●</span> Diagnostika baterie & GPS
+            </div>
+            <div class="chart-wrapper">
+              <canvas id="chartDiag"></canvas>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Metrics Comparison Table -->
+        <div class="table-card">
+          <div class="table-header-row">
+            <div class="table-title" id="matrixTitle">Srovnávací matice aktivit</div>
+            <button class="btn-export" onclick="exportToExcel()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              <span id="btnExportText">Export do Excelu (.xlsx)</span>
+            </button>
+          </div>
+          <div class="table-responsive">
+            <table class="compare-table" id="compareTable">
+              <!-- Populated dynamically -->
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <footer>
+      Garmin Activity Comparator &bull; 100% Klientské Zpracování V Prohlížeči &bull; Leaflet & Chart.js & SheetJS
+    </footer>
+
+  </div>
+
+  <script>
+    // --- i18n Translations ---
+    const i18n = {
+      cz: {
+        appTitle: "Garmin Activity Comparator",
+        privacyText: "100% Lokální klientské zpracování (Browser-Only)",
+        lblXAxis: "Osa X (Grafy):",
+        btnXTime: "Čas",
+        btnXDist: "Vzdálenost",
+        lblSpeedMode: "Rychlost / Tempo:",
+        btnSpeed: "Rychlost (km/h)",
+        btnPace: "Tempo (min/km)",
+        lblHRMode: "Srdeční tep:",
+        btnHRBpm: "Tepy (t/min)",
+        btnHRPercent: "% z Max HR",
+        dropzoneTitle: "Přetáhněte sem složky nebo .fit soubory (složky = jména uživatelů)",
+        dropzoneSubtitle: "Podporovány jsou dávkové nahrávky složek s podadresáři (např. /Vasek/, /Manzelka/) i jednotlivé soubory",
+        titleSuggested: "Navržené dvojice & skupiny",
+        titleFileList: "Vyberte 2 až 5 aktivit",
+        mapTitle: "Srovnávací mapa tras",
+        titleAltChart: "Nadmořská výška (m)",
+        titleSpeedChart: "Rychlost / Tempo",
+        titleHRChart: "Srdeční tep",
+        titleDiagChart: "Diagnostika baterie & GPS",
+        matrixTitle: "Srovnávací matice aktivit",
+        btnExportText: "Export do Excelu (.xlsx)",
+        statusProcessing: "Zpracovávám soubory ({progress}/{total})...",
+        statusDone: "Úspěšně načteno {count} FIT aktivit.",
+        scenarioATitle: "Společná aktivita",
+        scenarioBTitle: "Opakovaná trasa",
+        metricUser: "Uživatel / Složka",
+        metricDevice: "Zařízení & Model",
+        metricFW: "Verze SW & Sériové č.",
+        metricSensors: "Zdroje dat & Snímače",
+        metricRecordFreq: "Frekvence záznamu",
+        metricPointDensity: "Hustota GPS bodů",
+        metricDistance: "Celková vzdálenost",
+        metricDuration: "Čas (Uplynulý / Pohyb)",
+        metricAvgSpeed: "Průměrná rychlost",
+        metricAvgPace: "Průměrné tempo",
+        metricMaxSpeed: "Maximální rychlost",
+        metricAscent: "Celkový výstup / sestup",
+        metricAltRange: "Min / Max nadmořská výška",
+        metricAvgHR: "Průměrný ST",
+        metricMaxHR: "Maximální ST",
+        metricTemp: "Teplota okolí (Zdroj)",
+        metricBattery: "Pokles baterie",
+        sensorTempe: "Garmin Tempe (Externí teploměr)",
+        sensorSpeed: "Garmin Snímač Rychlosti Kola",
+        sensorOHR: "Integrovaný Optický Snímač ST",
+        sensorGPS: "Integrovaná GPS",
+        mode1s: "1s Záznam (Sekundový)",
+        modeSmart: "Chytrý záznam (Smart Recording)",
+        unknown: "Neznámý"
+      },
+      en: {
+        appTitle: "Garmin Activity Comparator",
+        privacyText: "100% Local Client Processing (Browser-Only)",
+        lblXAxis: "X-Axis (Charts):",
+        btnXTime: "Time",
+        btnXDist: "Distance",
+        lblSpeedMode: "Speed / Pace:",
+        btnSpeed: "Speed (km/h)",
+        btnPace: "Pace (min/km)",
+        lblHRMode: "Heart Rate:",
+        btnHRBpm: "BPM (bpm)",
+        btnHRPercent: "% of Max HR",
+        dropzoneTitle: "Drag & drop folders or .fit files (folders = user names)",
+        dropzoneSubtitle: "Supports folder trees with subdirectories (e.g. /Vasek/, /Wife/) and individual files",
+        titleSuggested: "Suggested Pairs & Groups",
+        titleFileList: "Select 2 to 5 Activities",
+        mapTitle: "Comparative Track Map",
+        titleAltChart: "Elevation Profile (m)",
+        titleSpeedChart: "Speed / Pace",
+        titleHRChart: "Heart Rate",
+        titleDiagChart: "Battery & GPS Diagnostics",
+        matrixTitle: "Activity Comparison Matrix",
+        btnExportText: "Export to Excel (.xlsx)",
+        statusProcessing: "Processing files ({progress}/{total})...",
+        statusDone: "Successfully loaded {count} FIT activities.",
+        scenarioATitle: "Co-Activity",
+        scenarioBTitle: "Route Repeat",
+        metricUser: "User / Folder",
+        metricDevice: "Device & Model",
+        metricFW: "SW Version & Serial No.",
+        metricSensors: "Data Sources & Sensors",
+        metricRecordFreq: "Recording Frequency",
+        metricPointDensity: "GPS Point Density",
+        metricDistance: "Total Distance",
+        metricDuration: "Duration (Total / Moving)",
+        metricAvgSpeed: "Avg Speed",
+        metricAvgPace: "Avg Pace",
+        metricMaxSpeed: "Max Speed",
+        metricAscent: "Total Ascent / Descent",
+        metricAltRange: "Min / Max Altitude",
+        metricAvgHR: "Avg HR",
+        metricMaxHR: "Max HR",
+        metricTemp: "Ambient Temp (Source)",
+        metricBattery: "Battery Drop",
+        sensorTempe: "Garmin Tempe (External Temp)",
+        sensorSpeed: "Garmin Bike Speed Sensor",
+        sensorOHR: "Integrated Optical Wrist HR",
+        sensorGPS: "Integrated GPS",
+        mode1s: "1s Recording",
+        modeSmart: "Smart Recording",
+        unknown: "Unknown"
+      }
+    };
+
+    // --- State Variables ---
+    let currentLang = 'cz';
+    let xAxisMode = 'time'; // 'time' or 'distance'
+    let speedMode = 'speed'; // 'speed' or 'pace'
+    let hrMode = 'bpm'; // 'bpm' or 'percent'
+    
+    let allActivities = [];
+    let selectedIndices = [];
+    let suggestedGroups = [];
+
+    const TRACK_COLORS = ['#38bdf8', '#c084fc', '#34d399', '#fbbf24', '#f43f5e'];
+
+    // Map & Charts references
+    let map = null;
+    let mapPolylineGroup = null;
+    let mapMarkerGroup = null;
+    let crosshairMarkers = [];
+
+    let chartAlt = null;
+    let chartSpeed = null;
+    let chartHR = null;
+    let chartDiag = null;
+
+    // --- Garmin Product ID Mapping ---
+    const GARMIN_PRODUCTS = {
+      3907: "Garmin Quatix 7 / Fēnix 7 Sapphire Solar",
+      4374: "Garmin Fēnix 7 Pro / Solar",
+      3843: "Garmin Fēnix 7 Standard",
+      4125: "Garmin Forerunner 255",
+      3589: "Garmin Venu 2/3",
+      4105: "Garmin Epix Gen 2",
+      3638: "Garmin Edge 1040"
+    };
+
+    function getDeviceName(productID, manufacturerID) {
+      if (GARMIN_PRODUCTS[productID]) return GARMIN_PRODUCTS[productID];
+      if (manufacturerID === 1) return `Garmin Device (Model ID ${productID || 'N/A'})`;
+      return `Sports Device (${productID || 'Generic'})`;
+    }
+
+    // --- UI Language & Controls Toggles ---
+    function setLanguage(lang) {
+      currentLang = lang;
+      document.getElementById('btnCZ').classList.toggle('active', lang === 'cz');
+      document.getElementById('btnEN').classList.toggle('active', lang === 'en');
+      
+      const t = i18n[lang];
+      document.getElementById('appTitle').innerText = t.appTitle;
+      document.getElementById('privacyText').innerText = t.privacyText;
+      document.getElementById('lblXAxis').innerText = t.lblXAxis;
+      document.getElementById('btnXTime').innerText = t.btnXTime;
+      document.getElementById('btnXDist').innerText = t.btnXDist;
+      document.getElementById('lblSpeedMode').innerText = t.lblSpeedMode;
+      document.getElementById('btnSpeed').innerText = t.btnSpeed;
+      document.getElementById('btnPace').innerText = t.btnPace;
+      document.getElementById('lblHRMode').innerText = t.lblHRMode;
+      document.getElementById('btnHRBpm').innerText = t.btnHRBpm;
+      document.getElementById('btnHRPercent').innerText = t.btnHRPercent;
+      document.getElementById('dropzoneTitle').innerText = t.dropzoneTitle;
+      document.getElementById('dropzoneSubtitle').innerText = t.dropzoneSubtitle;
+      document.getElementById('titleSuggested').querySelector('span').innerText = t.titleSuggested;
+      document.getElementById('titleFileList').querySelector('span').innerText = t.titleFileList;
+      document.getElementById('mapTitle').innerText = t.mapTitle;
+      document.getElementById('matrixTitle').innerText = t.matrixTitle;
+      document.getElementById('btnExportText').innerText = t.btnExportText;
+
+      if (allActivities.length > 0) {
+        renderSidebar();
+        renderDashboard();
+      }
+    }
+
+    function setXAxis(mode) {
+      xAxisMode = mode;
+      document.getElementById('btnXTime').classList.toggle('active', mode === 'time');
+      document.getElementById('btnXDist').classList.toggle('active', mode === 'distance');
+      if (selectedIndices.length > 0) updateCharts();
+    }
+
+    function setSpeedMode(mode) {
+      speedMode = mode;
+      document.getElementById('btnSpeed').classList.toggle('active', mode === 'speed');
+      document.getElementById('btnPace').classList.toggle('active', mode === 'pace');
+      if (selectedIndices.length > 0) {
+        updateCharts();
+        renderTable();
+      }
+    }
+
+    function setHRMode(mode) {
+      hrMode = mode;
+      document.getElementById('btnHRBpm').classList.toggle('active', mode === 'bpm');
+      document.getElementById('btnHRPercent').classList.toggle('active', mode === 'percent');
+      if (selectedIndices.length > 0) updateCharts();
+    }
+
+    // --- Haversine Distance Calculation ---
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    // --- Native Binary FIT Parser (Fallback Engine) ---
+    function parseFitNative(arrayBuffer, filePathName) {
+      try {
+        const data = new Uint8Array(arrayBuffer);
+        if (data.length < 14) return null;
+        const headerSize = data[0];
+        const view = new DataView(arrayBuffer);
+        const dataSize = view.getUint32(4, true);
+        const bodyEnd = Math.min(headerSize + dataSize, data.length);
+
+        const defs = {};
+        const records = [];
+        const deviceInfos = [];
+        let fileId = {};
+
+        let idx = headerSize;
+        while (idx < bodyEnd) {
+          const hdr = data[idx++];
+          if ((hdr & 0x80) === 0) {
+            const localMsgType = hdr & 0x0F;
+            const isDef = (hdr & 0x40) !== 0;
+            const hasDev = (hdr & 0x20) !== 0;
+
+            if (isDef) {
+              if (idx + 5 > bodyEnd) break;
+              const arch = data[idx + 1];
+              const globalMsgNum = view.getUint16(idx + 2, arch === 0);
+              idx += 4;
+              const numFields = data[idx++];
+              const fields = [];
+              for (let f = 0; f < numFields; f++) {
+                if (idx + 3 > bodyEnd) break;
+                fields.push({ num: data[idx], size: data[idx + 1], type: data[idx + 2] });
+                idx += 3;
+              }
+              const devFields = [];
+              if (hasDev) {
+                if (idx >= bodyEnd) break;
+                const numDev = data[idx++];
+                for (let d = 0; d < numDev; d++) {
+                  if (idx + 3 > bodyEnd) break;
+                  devFields.push({ num: data[idx], size: data[idx + 1], idx: data[idx + 2] });
+                  idx += 3;
+                }
+              }
+              defs[localMsgType] = { globalMsgNum, isLittle: (arch === 0), fields, devFields };
+            } else {
+              const def = defs[localMsgType];
+              if (!def) break;
+              const isLittle = def.isLittle;
+              const msgData = {};
+              for (const field of def.fields) {
+                if (idx + field.size > data.length) break;
+                msgData[field.num] = { raw: data.subarray(idx, idx + field.size), size: field.size };
+                idx += field.size;
+              }
+              if (def.devFields) {
+                for (const df of def.devFields) idx += df.size;
+              }
+
+              const gNum = def.globalMsgNum;
+              if (gNum === 0) { // file_id
+                for (const fNum in msgData) {
+                  const { raw, size } = msgData[fNum];
+                  const dv = new DataView(raw.buffer, raw.byteOffset, size);
+                  if (fNum == 1 && size === 2) fileId.manufacturer = dv.getUint16(0, isLittle);
+                  else if (fNum == 2 && size === 2) fileId.product = dv.getUint16(0, isLittle);
+                  else if (fNum == 3 && size === 4) fileId.serialNumber = dv.getUint32(0, isLittle);
+                }
+              } else if (gNum === 23) { // device_info
+                const dItem = {};
+                for (const fNum in msgData) {
+                  const { raw, size } = msgData[fNum];
+                  const dv = new DataView(raw.buffer, raw.byteOffset, size);
+                  if (fNum == 0 && size === 1) dItem.deviceIndex = raw[0];
+                  else if (fNum == 1 && size === 1) dItem.deviceType = raw[0];
+                  else if (fNum == 2 && size === 2) dItem.manufacturer = dv.getUint16(0, isLittle);
+                  else if (fNum == 4 && size === 2) dItem.softwareVersion = dv.getUint16(0, isLittle) / 100.0;
+                  else if (fNum == 5 && size === 4) dItem.serialNumber = dv.getUint32(0, isLittle);
+                  else if (fNum == 25 && size === 1) dItem.antplusDeviceType = raw[0];
+                  else if (fNum == 11 && size === 1) dItem.batteryLevel = raw[0];
+                }
+                deviceInfos.push(dItem);
+              } else if (gNum === 20) { // record
+                const rec = {};
+                for (const fNum in msgData) {
+                  const { raw, size } = msgData[fNum];
+                  const dv = new DataView(raw.buffer, raw.byteOffset, size);
+                  if (fNum == 253 && size === 4) rec.timestamp = new Date((dv.getUint32(0, isLittle) + 631065600) * 1000);
+                  else if (fNum == 0 && size === 4) rec.lat = dv.getInt32(0, isLittle) * (180.0 / 2147483648.0);
+                  else if (fNum == 1 && size === 4) rec.lng = dv.getInt32(0, isLittle) * (180.0 / 2147483648.0);
+                  else if (fNum == 2 && size === 2) rec.alt = dv.getUint16(0, isLittle) / 5.0 - 500.0;
+                  else if (fNum == 3 && size === 1) rec.hr = raw[0];
+                  else if (fNum == 4 && size === 1) rec.cadence = raw[0];
+                  else if (fNum == 6 && size === 2) rec.speed = dv.getUint16(0, isLittle) / 1000.0;
+                  else if (fNum == 7 && size === 2) rec.power = dv.getUint16(0, isLittle);
+                  else if (fNum == 13 && size === 1) rec.temp = dv.getInt8(0);
+                }
+                if (rec.lat && rec.lng) records.append ? records.append(rec) : records.push(rec);
+              }
+            }
+          } else {
+            const localMsgType = (hdr >> 5) & 0x03;
+            const def = defs[localMsgType];
+            if (!def) break;
+            for (const field of def.fields) idx += field.size;
+            if (def.devFields) for (const df of def.devFields) idx += df.size;
+          }
+        }
+
+        if (records.length === 0) return null;
+
+        // Process analytical metrics
+        let totalDist = 0;
+        let asc = 0, desc = 0;
+        let activeSec = 0;
+
+        for (let i = 0; i < records.length; i++) {
+          if (i === 0) {
+            records[i].dist = 0;
+            records[i].elapsedSec = 0;
+          } else {
+            const prev = records[i - 1];
+            const curr = records[i];
+            const stepDist = haversineDistance(prev.lat, prev.lng, curr.lat, curr.lng);
+            totalDist += stepDist;
+            curr.dist = totalDist;
+
+            const timeDelta = (curr.timestamp - prev.timestamp) / 1000;
+            curr.elapsedSec = prev.elapsedSec + (timeDelta > 0 ? timeDelta : 1);
+
+            if (curr.speed > 0.5) activeSec += (timeDelta > 0 ? timeDelta : 1);
+
+            if (curr.alt !== undefined && prev.alt !== undefined) {
+              const diff = curr.alt - prev.alt;
+              if (diff > 0) asc += diff;
+              else desc += Math.abs(diff);
+            }
+          }
+        }
+
+        // Sampling frequency & Smart Recording analysis
+        const deltas = [];
+        for (let i = 1; i < records.length; i++) {
+          const d = (records[i].timestamp - records[i - 1].timestamp) / 1000;
+          if (d > 0 && d < 300) deltas.push(d);
+        }
+        const avgInterval = deltas.length > 0 ? (deltas.reduce((a, b) => a + b, 0) / deltas.length) : 1;
+        const onesCount = deltas.filter(d => Math.abs(d - 1) < 0.2).length;
+        const percent1s = deltas.length > 0 ? (onesCount / deltas.length * 100) : 100;
+        const is1sRecording = percent1s >= 95;
+
+        // Extract user/folder tag
+        let userTag = "User";
+        if (filePathName.includes('/')) {
+          const parts = filePathName.split('/');
+          if (parts.length > 1 && parts[parts.length - 2]) userTag = parts[parts.length - 2];
+        } else if (filePathName.includes('\\')) {
+          const parts = filePathName.split('\\');
+          if (parts.length > 1 && parts[parts.length - 2]) userTag = parts[parts.length - 2];
+        } else {
+          userTag = filePathName.replace(/\.fit$/i, '');
+        }
+
+        // External Sensors Detection
+        const hasTempe = deviceInfos.some(d => d.deviceType === 25 || d.antplusDeviceType === 25);
+        const hasSpeedSensor = deviceInfos.some(d => d.deviceType === 123 || d.antplusDeviceType === 123 || d.deviceType === 1);
+
+        return {
+          filename: filePathName.split(/[/\\]/).pop(),
+          user: userTag,
+          productID: fileId.product,
+          manufacturerID: fileId.manufacturer,
+          deviceName: getDeviceName(fileId.product, fileId.manufacturer),
+          serialNumber: fileId.serialNumber || 'N/A',
+          swVersion: deviceInfos[0]?.softwareVersion || 'N/A',
+          records: records,
+          totalDistance: totalDist / 1000.0, // km
+          elapsedSec: records[records.length - 1].elapsedSec,
+          activeSec: activeSec,
+          ascent: asc,
+          descent: desc,
+          avgIntervalSec: avgInterval,
+          percent1s: percent1s,
+          is1sRecording: is1sRecording,
+          gpsPointsCount: records.length,
+          pointDensityPerKm: (records.length / (totalDist / 1000.0)).toFixed(0),
+          hasTempeSensor: hasTempe,
+          hasSpeedSensor: hasSpeedSensor,
+          deviceInfos: deviceInfos
+        };
+      } catch (e) {
+        console.error("Parse native FIT error:", e);
+        return null;
+      }
+    }
+
+    // --- File Drag & Drop / Upload Handler ---
+    async function handleFileSelect(e) {
+      const files = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.fit'));
+      if (files.length === 0) return;
+
+      const statusBar = document.getElementById('statusBar');
+      const statusText = document.getElementById('statusText');
+      const statusSpinner = document.getElementById('statusSpinner');
+      const statusCheck = document.getElementById('statusCheck');
+
+      statusBar.style.display = 'flex';
+      statusSpinner.style.display = 'block';
+      statusCheck.style.display = 'none';
+
+      allActivities = [];
+      await new Promise(r => setTimeout(r, 40));
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        statusText.innerText = i18n[currentLang].statusProcessing.replace('{progress}', i + 1).replace('{total}', files.length);
+
+        try {
+          const buffer = await file.arrayBuffer();
+          const parsed = parseFitNative(buffer, file.webkitRelativePath || file.name);
+          if (parsed) allActivities.push(parsed);
+        } catch (err) {
+          console.error("Error processing file:", file.name, err);
+        }
+      }
+
+      statusSpinner.style.display = 'none';
+      statusCheck.style.display = 'flex';
+      statusText.innerText = i18n[currentLang].statusDone.replace('{count}', allActivities.length);
+
+      // Run Automatic Pairing Algorithm
+      computeMatchingGroups();
+
+      // Default selection: select up to first 3 activities
+      selectedIndices = allActivities.slice(0, Math.min(3, allActivities.length)).map((_, idx) => idx);
+
+      document.getElementById('dashboardLayout').style.display = 'grid';
+      renderSidebar();
+      renderDashboard();
+    }
+
+    // --- Automatic Activity Pairing Engine (Scenario A & B) ---
+    function computeMatchingGroups() {
+      suggestedGroups = [];
+
+      // Scenario A: Co-activities (Different users, overlapping start time ±15 min, similar duration)
+      for (let i = 0; i < allActivities.length; i++) {
+        for (let j = i + 1; j < allActivities.length; j++) {
+          const a1 = allActivities[i];
+          const a2 = allActivities[j];
+
+          if (a1.user !== a2.user && a1.records[0] && a2.records[0]) {
+            const timeDiff = Math.abs((a1.records[0].timestamp - a2.records[0].timestamp) / 1000); // seconds
+            const durationRatio = a1.elapsedSec / (a2.elapsedSec || 1);
+
+            if (timeDiff <= 900 && durationRatio >= 0.7 && durationRatio <= 1.3) {
+              suggestedGroups.push({
+                type: 'scenario-a',
+                title: `${i18n[currentLang].scenarioATitle}: ${a1.user} & ${a2.user}`,
+                subtext: `${a1.records[0].timestamp.toLocaleDateString()} @ ${a1.records[0].timestamp.toLocaleTimeString().slice(0,5)} (${a1.totalDistance.toFixed(1)} km)`,
+                indices: [i, j]
+              });
+            }
+          }
+        }
+      }
+
+      // Scenario B: Route Repeats (Same user/device, different dates, start/finish within 100m)
+      for (let i = 0; i < allActivities.length; i++) {
+        for (let j = i + 1; j < allActivities.length; j++) {
+          const a1 = allActivities[i];
+          const a2 = allActivities[j];
+
+          if (a1.user === a2.user && a1.records[0] && a2.records[0]) {
+            const startDist = haversineDistance(a1.records[0].lat, a1.records[0].lng, a2.records[0].lat, a2.records[0].lng);
+            const end1 = a1.records[a1.records.length - 1];
+            const end2 = a2.records[a2.records.length - 1];
+            const endDist = haversineDistance(end1.lat, end1.lng, end2.lat, end2.lng);
+
+            if (startDist <= 100 && endDist <= 100) {
+              suggestedGroups.push({
+                type: 'scenario-b',
+                title: `${i18n[currentLang].scenarioBTitle}: ${a1.user} (${a1.deviceName})`,
+                subtext: `${a1.records[0].timestamp.toLocaleDateString()} vs ${a2.records[0].timestamp.toLocaleDateString()} (${a1.totalDistance.toFixed(1)} km)`,
+                indices: [i, j]
+              });
+            }
+          }
+        }
+      }
+    }
+
+    // --- Sidebar Rendering ---
+    function renderSidebar() {
+      const groupsContainer = document.getElementById('suggestedGroups');
+      groupsContainer.innerHTML = '';
+
+      if (suggestedGroups.length === 0) {
+        groupsContainer.innerHTML = `<div style="color:var(--text-muted); font-size:0.82rem;">Žádné automatické páry nebyly nalezeny. Vyberte aktivity ručně ze seznamu níže.</div>`;
+      } else {
+        suggestedGroups.forEach(grp => {
+          const item = document.createElement('div');
+          item.className = `group-item ${grp.type}`;
+          item.onclick = () => {
+            selectedIndices = [...grp.indices];
+            renderSidebar();
+            renderDashboard();
+          };
+
+          const badgeText = grp.type === 'scenario-a' ? 'Scénář A: Společná' : 'Scénář B: Opakovaná';
+          const badgeClass = grp.type === 'scenario-a' ? 'badge-scenario-a' : 'badge-scenario-b';
+
+          item.innerHTML = `
+            <span class="group-badge ${badgeClass}">${badgeText}</span>
+            <div class="group-name">${grp.title}</div>
+            <div class="group-subtext">${grp.subtext}</div>
+          `;
+          groupsContainer.appendChild(item);
+        });
+      }
+
+      // Render File Checkbox List
+      const listContainer = document.getElementById('fileListContainer');
+      listContainer.innerHTML = '';
+
+      allActivities.forEach((act, idx) => {
+        const item = document.createElement('div');
+        const isSel = selectedIndices.includes(idx);
+        const selOrder = selectedIndices.indexOf(idx);
+        const color = selOrder >= 0 ? TRACK_COLORS[selOrder % TRACK_COLORS.length] : 'transparent';
+
+        item.className = `file-item ${isSel ? 'selected' : ''}`;
+        item.onclick = (e) => {
+          if (e.target.tagName !== 'INPUT') toggleActivitySelection(idx);
+        };
+
+        item.innerHTML = `
+          <input type="checkbox" class="file-checkbox" ${isSel ? 'checked' : ''} onchange="toggleActivitySelection(${idx})">
+          <div class="color-dot" style="background: ${color}; border: ${isSel ? 'none' : '1px solid var(--text-muted)'};"></div>
+          <div class="file-info">
+            <div class="file-title">${act.user} &bull; ${act.filename}</div>
+            <div class="file-meta">${act.deviceName} &bull; ${act.totalDistance.toFixed(1)} km &bull; ${act.records[0]?.timestamp?.toLocaleDateString() || ''}</div>
+          </div>
+        `;
+        listContainer.appendChild(item);
+      });
+    }
+
+    function toggleActivitySelection(idx) {
+      if (selectedIndices.includes(idx)) {
+        selectedIndices = selectedIndices.filter(i => i !== idx);
+      } else {
+        if (selectedIndices.length >= 5) {
+          alert("Lze porovnávat maximálně 5 aktivit najednou.");
+          return;
+        }
+        selectedIndices.push(idx);
+      }
+      renderSidebar();
+      renderDashboard();
+    }
+
+    // --- Main Dashboard Rendering (Map, Charts & Table) ---
+    function renderDashboard() {
+      renderMap();
+      updateCharts();
+      renderTable();
+    }
+
+    // --- Synchronized Map Rendering ---
+    function renderMap() {
+      if (!map) {
+        map = L.map('map').setView([50.0755, 14.4378], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+
+        mapPolylineGroup = L.layerGroup().addTo(map);
+        mapMarkerGroup = L.layerGroup().addTo(map);
+      } else {
+        mapPolylineGroup.clearLayers();
+        mapMarkerGroup.clearLayers();
+      }
+
+      crosshairMarkers = [];
+      if (selectedIndices.length === 0) return;
+
+      const bounds = L.latLngBounds();
+
+      selectedIndices.forEach((actIdx, colorIdx) => {
+        const act = allActivities[actIdx];
+        const color = TRACK_COLORS[colorIdx % TRACK_COLORS.length];
+        const latLngs = act.records.map(r => [r.lat, r.lng]);
+
+        if (latLngs.length > 0) {
+          const polyline = L.polyline(latLngs, { color: color, weight: 4, opacity: 0.85 });
+          mapPolylineGroup.addLayer(polyline);
+
+          latLngs.forEach(ll => bounds.extend(ll));
+
+          // Start & Finish Markers
+          const startPt = latLngs[0];
+          const endPt = latLngs[latLngs.length - 1];
+
+          mapMarkerGroup.addLayer(L.circleMarker(startPt, { radius: 6, color: '#10b981', fillColor: '#059669', fillOpacity: 1 }));
+          mapMarkerGroup.addLayer(L.circleMarker(endPt, { radius: 6, color: '#ef4444', fillColor: '#dc2626', fillOpacity: 1 }));
+
+          // Live Crosshair Marker for chart sync
+          const crosshair = L.circleMarker(startPt, {
+            radius: 8,
+            color: '#ffffff',
+            fillColor: color,
+            fillOpacity: 1,
+            weight: 3
+          });
+          mapMarkerGroup.addLayer(crosshair);
+          crosshairMarkers.push(crosshair);
+        }
+      });
+
+      map.fitBounds(bounds, { padding: [30, 30] });
+
+      const legendSummary = selectedIndices.map((actIdx, colorIdx) => {
+        const act = allActivities[actIdx];
+        const color = TRACK_COLORS[colorIdx % TRACK_COLORS.length];
+        return `<span style="color:${color}; font-weight:700;">■ ${act.user} (${act.deviceName})</span>`;
+      }).join(' &nbsp; ');
+      document.getElementById('mapLegendSummary').innerHTML = legendSummary;
+    }
+
+    // --- Chart.js Multi-Grid with Crosshair Synchronization ---
+    function updateCharts() {
+      if (selectedIndices.length === 0) return;
+
+      const activeActs = selectedIndices.map(i => allActivities[i]);
+
+      // Prepare Datasets for 4 Charts
+      const altDatasets = [];
+      const speedDatasets = [];
+      const hrDatasets = [];
+      const diagDatasets = [];
+
+      activeActs.forEach((act, colorIdx) => {
+        const color = TRACK_COLORS[colorIdx % TRACK_COLORS.length];
+        const label = `${act.user} (${act.deviceName})`;
+
+        const dataAlt = [];
+        const dataSpeed = [];
+        const dataHR = [];
+        const dataDiag = [];
+
+        act.records.forEach(r => {
+          const xVal = xAxisMode === 'time' ? (r.elapsedSec / 60.0) : r.dist / 1000.0;
+
+          // Altitude
+          dataAlt.push({ x: xVal, y: r.alt !== undefined ? r.alt : null });
+
+          // Speed / Pace
+          let spdVal = null;
+          if (r.speed !== undefined) {
+            if (speedMode === 'speed') spdVal = (r.speed * 3.6); // km/h
+            else spdVal = r.speed > 0.3 ? (1000.0 / (r.speed * 60.0)) : null; // min/km
+          }
+          dataSpeed.push({ x: xVal, y: spdVal });
+
+          // HR
+          let hrVal = null;
+          if (r.hr !== undefined) {
+            hrVal = hrMode === 'bpm' ? r.hr : (r.hr / 190.0 * 100.0); // % z max
+          }
+          dataHR.push({ x: xVal, y: hrVal });
+
+          // Temp / Battery / GPS Accuracy (Diag)
+          dataDiag.push({ x: xVal, y: r.temp !== undefined ? r.temp : null });
+        });
+
+        altDatasets.push({ label, data: dataAlt, borderColor: color, backgroundColor: color + '22', fill: true, borderWidth: 2, pointRadius: 0 });
+        speedDatasets.push({ label, data: dataSpeed, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
+        hrDatasets.push({ label, data: dataHR, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
+        diagDatasets.push({ label, data: dataDiag, borderColor: color, fill: false, borderWidth: 2, pointRadius: 0 });
+      });
+
+      // Chart Config Generator
+      const xTitle = xAxisMode === 'time' ? 'Čas (min)' : 'Vzdálenost (km)';
+
+      function createChartConfig(datasets, yTitle) {
+        return {
+          type: 'line',
+          data: { datasets },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y !== null ? ctx.parsed.y.toFixed(1) : 'N/A'}`
+                }
+              }
+            },
+            scales: {
+              x: { type: 'linear', title: { display: true, text: xTitle, color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+              y: { title: { display: true, text: yTitle, color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }
+            },
+            onHover: (evt, activeElements) => {
+              if (activeElements.length > 0) {
+                const dataIdx = activeElements[0].index;
+                updateMapCrosshair(dataIdx);
+              }
+            }
+          }
+        };
+      }
+
+      if (chartAlt) chartAlt.destroy();
+      if (chartSpeed) chartSpeed.destroy();
+      if (chartHR) chartHR.destroy();
+      if (chartDiag) chartDiag.destroy();
+
+      chartAlt = new Chart(document.getElementById('chartAlt'), createChartConfig(altDatasets, 'Nadmořská výška (m)'));
+      chartSpeed = new Chart(document.getElementById('chartSpeed'), createChartConfig(speedDatasets, speedMode === 'speed' ? 'Rychlost (km/h)' : 'Tempo (min/km)'));
+      chartHR = new Chart(document.getElementById('chartHR'), createChartConfig(hrDatasets, hrMode === 'bpm' ? 'Tepy (t/min)' : '% z Max HR'));
+      chartDiag = new Chart(document.getElementById('chartDiag'), createChartConfig(diagDatasets, 'Teplota okolí (°C)'));
+    }
+
+    function updateMapCrosshair(pointIndex) {
+      selectedIndices.forEach((actIdx, colorIdx) => {
+        const act = allActivities[actIdx];
+        if (act && act.records[pointIndex] && crosshairMarkers[colorIdx]) {
+          const r = act.records[pointIndex];
+          crosshairMarkers[colorIdx].setLatLng([r.lat, r.lng]);
+        }
+      });
+    }
+
+    // --- Side-by-Side Comparison Matrix Table ---
+    function renderTable() {
+      const table = document.getElementById('compareTable');
+      table.innerHTML = '';
+      const t = i18n[currentLang];
+
+      if (selectedIndices.length === 0) return;
+
+      const activeActs = selectedIndices.map(i => allActivities[i]);
+
+      // Table Header Row
+      let html = `<thead><tr><th>Metrika / Vlastnost</th>`;
+      activeActs.forEach((act, colorIdx) => {
+        const color = TRACK_COLORS[colorIdx % TRACK_COLORS.length];
+        html += `<th style="color:${color};">■ ${act.user} (${act.deviceName})</th>`;
+      });
+      html += `</tr></thead><tbody>`;
+
+      // Helper function to generate table rows
+      function addRow(label, values) {
+        html += `<tr><td><strong>${label}</strong></td>`;
+        values.forEach(v => { html += `<td>${v}</td>`; });
+        html += `</tr>`;
+      }
+
+      addRow(t.metricUser, activeActs.map(a => a.user));
+      addRow(t.metricDevice, activeActs.map(a => a.deviceName));
+      addRow(t.metricFW, activeActs.map(a => `SW v${a.swVersion} (S/N: ${a.serialNumber})`));
+
+      // External Data Sources & Sensors
+      addRow(t.metricSensors, activeActs.map(a => {
+        let badges = `<span class="sensor-badge">${t.sensorGPS}</span>`;
+        if (a.hasTempeSensor) badges += `<span class="sensor-badge sensor-tempe">${t.sensorTempe}</span>`;
+        if (a.hasSpeedSensor) badges += `<span class="sensor-badge sensor-speed">${t.sensorSpeed}</span>`;
+        return badges;
+      }));
+
+      // Recording Frequency & Mode
+      addRow(t.metricRecordFreq, activeActs.map(a => {
+        const modeBadge = a.is1sRecording ? t.mode1s : t.modeSmart;
+        return `<strong>${modeBadge}</strong> (Ø ${a.avgIntervalSec.toFixed(2)}s krok, ${a.percent1s.toFixed(0)}% 1s bodů)`;
+      }));
+
+      addRow(t.metricPointDensity, activeActs.map(a => `${a.gpsPointsCount} bodů (${a.pointDensityPerKm} bodů/km)`));
+
+      addRow(t.metricDistance, activeActs.map(a => `<strong>${a.totalDistance.toFixed(2)} km</strong>`));
+
+      // Durations
+      addRow(t.metricDuration, activeActs.map(a => {
+        const totMin = Math.floor(a.elapsedSec / 60);
+        const movMin = Math.floor(a.activeSec / 60);
+        return `${totMin} min (Pohyb: ${movMin} min)`;
+      }));
+
+      // Speed & Pace
+      addRow(t.metricAvgSpeed, activeActs.map(a => {
+        const avgSpd = (a.totalDistance / (a.elapsedSec / 3600.0)).toFixed(1);
+        return `<strong>${avgSpd} km/h</strong>`;
+      }));
+
+      addRow(t.metricAvgPace, activeActs.map(a => {
+        const paceSec = (a.elapsedSec / a.totalDistance);
+        const pMin = Math.floor(paceSec / 60);
+        const pSec = Math.floor(paceSec % 60);
+        return `${pMin}:${pSec < 10 ? '0' : ''}${pSec} min/km`;
+      }));
+
+      // Elevation Gain / Loss
+      addRow(t.metricAscent, activeActs.map(a => `+${a.ascent.toFixed(0)} m / -${a.descent.toFixed(0)} m`));
+
+      // Temperature & Source
+      addRow(t.metricTemp, activeActs.map(a => {
+        const temps = a.records.map(r => r.temp).filter(v => v !== undefined);
+        if (temps.length === 0) return 'N/A';
+        const avgT = (temps.reduce((a, b) => a + b, 0) / temps.length).toFixed(1);
+        const srcLabel = a.hasTempeSensor ? `(${t.sensorTempe})` : `(Zápěstí)`;
+        return `${avgT} °C (Min: ${Math.min(...temps)}°C, Max: ${Math.max(...temps)}°C) ${srcLabel}`;
+      }));
+
+      html += `</tbody>`;
+      table.innerHTML = html;
+    }
+
+    // --- Excel Export (.xlsx via SheetJS) ---
+    function exportToExcel() {
+      if (selectedIndices.length === 0) return;
+
+      const t = i18n[currentLang];
+      const activeActs = selectedIndices.map(i => allActivities[i]);
+
+      // Sheet 1: Metrics Matrix Summary
+      const matrixData = [];
+      const headers = ["Metrika", ...activeActs.map(a => `${a.user} (${a.deviceName})`)];
+      matrixData.push(headers);
+
+      matrixData.push(["Uživatel / Složka", ...activeActs.map(a => a.user)]);
+      matrixData.push(["Zařízení & Model", ...activeActs.map(a => a.deviceName)]);
+      matrixData.push(["SW Verze & Sériové č.", ...activeActs.map(a => `SW v${a.swVersion} (S/N: ${a.serialNumber})`)]);
+      matrixData.push(["Režim Záznamu", ...activeActs.map(a => a.is1sRecording ? "1s Záznam" : "Chytrý záznam")]);
+      matrixData.push(["Průměrný rozestup bodů", ...activeActs.map(a => `${a.avgIntervalSec.toFixed(2)}s`)]);
+      matrixData.push(["Hustota GPS bodů", ...activeActs.map(a => `${a.gpsPointsCount} bodů (${a.pointDensityPerKm} bodů/km)`)]);
+      matrixData.push(["Celková vzdálenost (km)", ...activeActs.map(a => a.totalDistance.toFixed(2))]);
+      matrixData.push(["Celkový čas (min)", ...activeActs.map(a => (a.elapsedSec / 60).toFixed(1))]);
+      matrixData.push(["Nastoupané metry (m)", ...activeActs.map(a => a.ascent.toFixed(0))]);
+
+      const wsMatrix = XLSX.utils.aoa_to_sheet(matrixData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, wsMatrix, "Srovnani_Metrik");
+
+      XLSX.writeFile(wb, `Garmin_Comparator_Srovnani_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    }
+  </script>
+</body>
+</html>
