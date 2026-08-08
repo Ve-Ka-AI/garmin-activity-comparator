@@ -2095,11 +2095,21 @@
 
     // --- First Common Passage Point Alignment Algorithm ---
     function calculateCommonPassageOffsets(activeActs) {
-      const offsets = activeActs.map(() => ({ distOffset: 0, timeOffsetSec: 0 }));
-      if (!alignCommonPoint || activeActs.length < 2) return offsets;
+      const offsets = activeActs.map(() => ({ distOffset: 0, timeOffsetSec: 0, commonStartTS: null }));
+      if (activeActs.length === 0 || !activeActs[0].records || activeActs[0].records.length === 0) return offsets;
 
       const baseAct = activeActs[0];
-      if (!baseAct.records || baseAct.records.length === 0) return offsets;
+      const baseStartTS = baseAct.records[0].timestamp ? baseAct.records[0].timestamp.getTime() : null;
+      offsets[0].commonStartTS = baseStartTS;
+
+      if (!alignCommonPoint || activeActs.length < 2) {
+        activeActs.forEach((act, k) => {
+          if (k > 0 && act.records && act.records[0] && act.records[0].timestamp) {
+            offsets[k].commonStartTS = act.records[0].timestamp.getTime();
+          }
+        });
+        return offsets;
+      }
 
       for (let k = 1; k < activeActs.length; k++) {
         const targetAct = activeActs[k];
@@ -2113,13 +2123,18 @@
             if (d <= 50) {
               offsets[k] = {
                 distOffset: (tPt.dist || 0) / 1000.0 - (bPt.dist || 0) / 1000.0,
-                timeOffsetSec: (tPt.elapsedSec || 0) - (bPt.elapsedSec || 0)
+                timeOffsetSec: (tPt.elapsedSec || 0) - (bPt.elapsedSec || 0),
+                commonStartTS: tPt.timestamp ? tPt.timestamp.getTime() : (targetAct.records[0].timestamp ? targetAct.records[0].timestamp.getTime() : null)
               };
               found = true;
               break;
             }
           }
           if (found) break;
+        }
+
+        if (!found && targetAct.records && targetAct.records[0] && targetAct.records[0].timestamp) {
+          offsets[k].commonStartTS = targetAct.records[0].timestamp.getTime();
         }
       }
       return offsets;
@@ -2329,7 +2344,12 @@
         act.records.forEach((r, rIdx) => {
           let xVal = 0;
           if (xAxisMode === 'time') {
-            xVal = ((r.elapsedSec - timeOffsetSec) / 60.0);
+            if (alignCommonPoint && offsets[0].commonStartTS && r.timestamp) {
+              xVal = (r.timestamp.getTime() - offsets[0].commonStartTS) / 60000.0;
+            } else {
+              xVal = ((r.elapsedSec - timeOffsetSec) / 60.0);
+            }
+            if (alignCommonPoint && xVal < 0) return; // Skip pre-start waiting data before 1st common passage point!
           } else if (xAxisMode === 'geodist') {
             xVal = mapMatchedDists[colorIdx][rIdx];
           } else {
@@ -2468,9 +2488,16 @@
 
           for (let i = 0; i < act.records.length; i++) {
             const r = act.records[i];
-            const xVal = xAxisMode === 'time'
-              ? ((r.elapsedSec - timeOffsetSec) / 60.0)
-              : ((r.dist / 1000.0) - distOffset);
+            let xVal = 0;
+            if (xAxisMode === 'time') {
+              if (alignCommonPoint && offsets[0].commonStartTS && r.timestamp) {
+                xVal = (r.timestamp.getTime() - offsets[0].commonStartTS) / 60000.0;
+              } else {
+                xVal = ((r.elapsedSec - timeOffsetSec) / 60.0);
+              }
+            } else {
+              xVal = ((r.dist / 1000.0) - distOffset);
+            }
             const diff = Math.abs(xVal - targetXVal);
             if (diff < minDiff) {
               minDiff = diff;
