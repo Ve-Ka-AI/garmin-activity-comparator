@@ -742,15 +742,35 @@
 
     <!-- Upload Dropzone -->
     <div class="dropzone" id="dropzone">
-      <input type="file" id="fileInput" multiple webkitdirectory directory accept=".fit" onchange="handleFileSelect(event)">
+      <!-- Two hidden inputs: one for individual files, one for whole folder trees -->
+      <input type="file" id="fileInputFiles" multiple accept=".fit,.FIT" style="display:none;" onchange="handleFileSelect(event)">
+      <input type="file" id="fileInputFolder" webkitdirectory directory multiple accept=".fit,.FIT" style="display:none;" onchange="handleFileSelect(event)">
+
       <div class="cloud-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
           <path d="M16 16l-4-4-4 4M12 12v9" stroke-linecap="round" stroke-linejoin="round"/>
           <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
-      <div class="dropzone-title" id="dropzoneTitle">Přetáhněte sem složky nebo .fit soubory (složky = jména uživatelů)</div>
-      <div class="dropzone-subtitle" id="dropzoneSubtitle">Podporovány jsou dávkové nahrávky složek s podadresáři (např. /Vasek/, /Manzelka/) i jednotlivé soubory</div>
+      <div class="dropzone-title" id="dropzoneTitle">Přetáhněte sem .FIT soubory nebo celou složku</div>
+      <div class="dropzone-subtitle" id="dropzoneSubtitle">Podporováno je přetažení souborů i složek s podadresáři (např. /Vasek/, /Manzelka/)</div>
+      
+      <div style="margin-top: 1.25rem; display: flex; justify-content: center; gap: 0.85rem; flex-wrap: wrap;">
+        <button type="button" class="btn-export" style="background: linear-gradient(135deg, #38bdf8, #0284c7); box-shadow: 0 4px 14px rgba(56,189,248,0.35);" onclick="document.getElementById('fileInputFiles').click()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <span id="btnSelectFiles">Vybrat .FIT soubory</span>
+        </button>
+
+        <button type="button" class="btn-export" style="background: linear-gradient(135deg, #818cf8, #4f46e5); box-shadow: 0 4px 14px rgba(129,140,248,0.35);" onclick="document.getElementById('fileInputFolder').click()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span id="btnSelectFolder">Vybrat složku</span>
+        </button>
+      </div>
     </div>
 
     <!-- Status Bar -->
@@ -899,8 +919,10 @@
         lblHRMode: "Srdeční tep:",
         btnHRBpm: "Tepy (t/min)",
         btnHRPercent: "% z Max HR",
-        dropzoneTitle: "Přetáhněte sem složky nebo .fit soubory (složky = jména uživatelů)",
-        dropzoneSubtitle: "Podporovány jsou dávkové nahrávky složek s podadresáři (např. /Vasek/, /Manzelka/) i jednotlivé soubory",
+        dropzoneTitle: "Přetáhněte sem .FIT soubory nebo celou složku",
+        dropzoneSubtitle: "Podporováno je přetažení souborů i složek s podadresáři (např. /Vasek/, /Manzelka/)",
+        btnSelectFiles: "Vybrat .FIT soubory",
+        btnSelectFolder: "Vybrat složku",
         titleSuggested: "Navržené dvojice & skupiny",
         titleFileList: "Vyberte 2 až 5 aktivit",
         mapTitle: "Srovnávací mapa tras",
@@ -951,8 +973,10 @@
         lblHRMode: "Heart Rate:",
         btnHRBpm: "BPM (bpm)",
         btnHRPercent: "% of Max HR",
-        dropzoneTitle: "Drag & drop folders or .fit files (folders = user names)",
-        dropzoneSubtitle: "Supports folder trees with subdirectories (e.g. /Vasek/, /Wife/) and individual files",
+        dropzoneTitle: "Drag & drop .FIT files or whole folders here",
+        dropzoneSubtitle: "Supports dragging files and folder trees with subdirectories (e.g. /Vasek/, /Wife/)",
+        btnSelectFiles: "Select .FIT Files",
+        btnSelectFolder: "Select Folder",
         titleSuggested: "Suggested Pairs & Groups",
         titleFileList: "Select 2 to 5 Activities",
         mapTitle: "Comparative Track Map",
@@ -1053,6 +1077,8 @@
       document.getElementById('btnHRPercent').innerText = t.btnHRPercent;
       document.getElementById('dropzoneTitle').innerText = t.dropzoneTitle;
       document.getElementById('dropzoneSubtitle').innerText = t.dropzoneSubtitle;
+      document.getElementById('btnSelectFiles').innerText = t.btnSelectFiles;
+      document.getElementById('btnSelectFolder').innerText = t.btnSelectFolder;
       document.getElementById('titleSuggested').querySelector('span').innerText = t.titleSuggested;
       document.getElementById('titleFileList').querySelector('span').innerText = t.titleFileList;
       document.getElementById('mapTitle').innerText = t.mapTitle;
@@ -1297,10 +1323,9 @@
       }
     }
 
-    // --- File Drag & Drop / Upload Handler ---
-    async function handleFileSelect(e) {
-      const files = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.fit'));
-      if (files.length === 0) return;
+    // --- File Drag & Drop & Input Select Handler ---
+    async function processFileListWithPaths(fileEntries) {
+      if (fileEntries.length === 0) return;
 
       const statusBar = document.getElementById('statusBar');
       const statusText = document.getElementById('statusText');
@@ -1314,13 +1339,16 @@
       allActivities = [];
       await new Promise(r => setTimeout(r, 40));
 
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        statusText.innerText = i18n[currentLang].statusProcessing.replace('{progress}', i + 1).replace('{total}', files.length);
+      for (let i = 0; i < fileEntries.length; i++) {
+        const item = fileEntries[i];
+        const file = item.file;
+        const pathName = item.path || file.webkitRelativePath || file.name;
+
+        statusText.innerText = i18n[currentLang].statusProcessing.replace('{progress}', i + 1).replace('{total}', fileEntries.length);
 
         try {
           const buffer = await file.arrayBuffer();
-          const parsed = parseFitNative(buffer, file.webkitRelativePath || file.name);
+          const parsed = parseFitNative(buffer, pathName);
           if (parsed) allActivities.push(parsed);
         } catch (err) {
           console.error("Error processing file:", file.name, err);
@@ -1340,6 +1368,76 @@
       document.getElementById('dashboardLayout').style.display = 'grid';
       renderSidebar();
       renderDashboard();
+    }
+
+    async function handleFileSelect(e) {
+      if (!e.target.files || e.target.files.length === 0) return;
+      const fileList = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.fit'));
+      const entries = fileList.map(f => ({ file: f, path: f.webkitRelativePath || f.name }));
+      await processFileListWithPaths(entries);
+    }
+
+    // --- HTML5 Drag and Drop Event Handling ---
+    const dropzone = document.getElementById('dropzone');
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dragover');
+    });
+
+    dropzone.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+
+      const fileEntries = [];
+      const items = Array.from(e.dataTransfer.items || []);
+
+      for (const item of items) {
+        if (item.kind === 'file') {
+          const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+          if (entry) {
+            await readEntryRecursive(entry, fileEntries, '');
+          } else {
+            const f = item.getAsFile();
+            if (f && f.name.toLowerCase().endsWith('.fit')) {
+              fileEntries.push({ file: f, path: f.name });
+            }
+          }
+        }
+      }
+
+      // Fallback for standard files array if webkitGetAsEntry didn't catch files
+      if (fileEntries.length === 0 && e.dataTransfer.files) {
+        Array.from(e.dataTransfer.files).forEach(f => {
+          if (f.name.toLowerCase().endsWith('.fit')) {
+            fileEntries.push({ file: f, path: f.name });
+          }
+        });
+      }
+
+      if (fileEntries.length > 0) {
+        await processFileListWithPaths(fileEntries);
+      }
+    });
+
+    async function readEntryRecursive(entry, fileEntries, currentPath) {
+      if (entry.isFile) {
+        if (entry.name.toLowerCase().endsWith('.fit')) {
+          const file = await new Promise(resolve => entry.file(resolve));
+          const fullPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+          fileEntries.push({ file: file, path: fullPath });
+        }
+      } else if (entry.isDirectory) {
+        const dirReader = entry.createReader();
+        const entries = await new Promise(resolve => dirReader.readEntries(resolve));
+        const dirPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+        for (const subEntry of entries) {
+          await readEntryRecursive(subEntry, fileEntries, dirPath);
+        }
+      }
     }
 
     // --- Automatic Activity Pairing Engine (Scenario A & B) ---
