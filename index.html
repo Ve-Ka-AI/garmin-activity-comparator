@@ -2218,7 +2218,16 @@
 
       // Render Tracks & Crosshairs
       selectedIndices.forEach((actIdx, colorIdx) => {
-        const ac          // Interactive click/hover on track line
+        const act = allActivities[actIdx];
+        const color = TRACK_COLORS[colorIdx % TRACK_COLORS.length];
+        const latLngs = act.records.map(r => [r.lat, r.lng]);
+
+        if (latLngs.length > 0) {
+          const polyline = L.polyline(latLngs, { color: color, weight: 5, opacity: 0.85 }).addTo(mapPolylineGroup);
+
+          latLngs.forEach(ll => bounds.extend(ll));
+
+          // Interactive click/hover on track line
           polyline.on('mousemove click', (e) => {
             const clickLL = e.latlng;
             let minDist = Infinity;
