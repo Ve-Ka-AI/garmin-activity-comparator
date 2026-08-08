@@ -850,7 +850,6 @@
         <div class="btn-segmented">
           <button class="seg-btn active" id="btnXGeoDist" onclick="setXAxis('geodist')" title="Geografické lícování tras v mapě (lícování vrcholů a údolí)">Trasa MAPA</button>
           <button class="seg-btn" id="btnXDist" onclick="setXAxis('distance')" title="Vzdálenost naměřená snímačem hodinek">Snímač</button>
-          <button class="seg-btn" id="btnXTime" onclick="setXAxis('time')">Čas</button>
         </div>
       </div>
 
@@ -1407,7 +1406,6 @@
       document.getElementById('appTitle').innerText = t.appTitle;
       document.getElementById('privacyText').innerText = t.privacyText;
       document.getElementById('lblXAxis').innerText = t.lblXAxis;
-      document.getElementById('btnXTime').innerText = t.btnXTime;
       document.getElementById('btnXDist').innerText = t.btnXDist;
       document.getElementById('lblSpeedMode').innerText = t.lblSpeedMode;
       document.getElementById('btnSpeed').innerText = t.btnSpeed;
@@ -1449,7 +1447,6 @@
       xAxisMode = mode;
       document.getElementById('btnXGeoDist').classList.toggle('active', mode === 'geodist');
       document.getElementById('btnXDist').classList.toggle('active', mode === 'distance');
-      document.getElementById('btnXTime').classList.toggle('active', mode === 'time');
       if (selectedIndices.length > 0) updateCharts();
     }
 
