@@ -1468,9 +1468,13 @@
     }
 
     // --- Temperature Moving Average Smoothing Filter ---
-    function smoothTemperatureSeries(series, windowSize = 25) {
-      const result = [];
+    function smoothTemperatureSeries(series) {
+      if (!series || series.length === 0) return [];
+      // Dynamic window size: 2.5% of total points (min 120 points, ~2 minutes)
+      const windowSize = Math.max(120, Math.floor(series.length * 0.025));
       const half = Math.floor(windowSize / 2);
+      const result = [];
+
       for (let i = 0; i < series.length; i++) {
         let sum = 0, count = 0;
         for (let j = Math.max(0, i - half); j <= Math.min(series.length - 1, i + half); j++) {
