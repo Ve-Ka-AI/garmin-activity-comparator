@@ -843,6 +843,22 @@
       </div>
     </header>
 
+    <!-- Top-Level Mode Switcher Bar -->
+    <div class="mode-switcher-card" style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 12px; padding: 0.75rem 1.25rem; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; box-shadow: 0 4px 20px rgba(0,0,0,0.25);">
+      <div style="display: flex; align-items: center; gap: 0.6rem;">
+        <span style="font-weight: 700; font-size: 0.92rem; color: #f8fafc;">Typ porovnání:</span>
+      </div>
+
+      <div class="btn-segmented" style="background: rgba(0, 0, 0, 0.4); padding: 4px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.08);">
+        <button class="seg-btn active" id="btnModeJoint" onclick="setComparisonMode('joint')" style="padding: 0.5rem 1.1rem; font-size: 0.88rem; font-weight: 600; border-radius: 6px;">
+          👥 Společná aktivita <span style="font-size: 0.75rem; opacity: 0.75; font-weight: 400;">(Více osob v 1 čase)</span>
+        </button>
+        <button class="seg-btn" id="btnModeIdentical" onclick="setComparisonMode('identical')" style="padding: 0.5rem 1.1rem; font-size: 0.88rem; font-weight: 600; border-radius: 6px;">
+          🔄 Moje totožné aktivity v čase <span style="font-size: 0.75rem; opacity: 0.75; font-weight: 400;">(Historie)</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Global Controls Toolbar -->
     <div class="toolbar-card">
       <div class="toggle-group">
@@ -869,7 +885,7 @@
         </div>
       </div>
 
-      <div class="toggle-group" style="margin-left: auto; display:flex; gap:0.9rem; align-items:center; background:rgba(255,255,255,0.03); padding:0.3rem 0.7rem; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
+      <div class="toggle-group" id="slidersGroup" style="margin-left: auto; display:none; gap:0.9rem; align-items:center; background:rgba(255,255,255,0.03); padding:0.3rem 0.7rem; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
         <div style="display:flex; align-items:center; gap:0.4rem;">
           <span class="toggle-label" title="Tolerovaný rozdíl celkové délky v %">Toler. délky: <strong id="valDistTolerance" style="color:var(--accent-blue);">5 %</strong></span>
           <input type="range" id="sliderDistTolerance" min="0" max="15" value="5" step="1" oninput="onDistToleranceChange(this.value)" title="Tolerovaný rozdíl celkové délky v % (0-15%)" style="accent-color: #38bdf8; cursor: pointer; vertical-align: middle; width: 70px;">
@@ -2157,83 +2173,110 @@
       }
     }
 
-    // --- Multi-Stage Route Matching Engine ---
+    let activeComparisonMode = 'joint'; // 'joint' = Společná aktivita, 'identical' = Moje totožné aktivity v čase
+
+    function setComparisonMode(mode) {
+      activeComparisonMode = mode;
+      const btnJoint = document.getElementById('btnModeJoint');
+      const btnIdentical = document.getElementById('btnModeIdentical');
+      const slidersGroup = document.getElementById('slidersGroup');
+
+      if (btnJoint) btnJoint.classList.toggle('active', mode === 'joint');
+      if (btnIdentical) btnIdentical.classList.toggle('active', mode === 'identical');
+      if (slidersGroup) slidersGroup.style.display = (mode === 'identical') ? 'flex' : 'none';
+
+      computeMatchingGroups();
+      renderSidebar();
+      if (selectedIndices.length > 0) {
+        renderDashboard();
+      }
+    }
+
+    // --- Multi-Stage Route Matching & Auto-Pairing Engine ---
     function computeMatchingGroups() {
       suggestedGroups = [];
       routeClusters = [];
 
-      // 1. Scenario A: Joint Rides (different users, same start time within 15 min, similar dist)
-      for (let i = 0; i < allActivities.length; i++) {
-        for (let j = i + 1; j < allActivities.length; j++) {
-          const a1 = allActivities[i];
-          const a2 = allActivities[j];
+      if (activeComparisonMode === 'joint') {
+        // --- Režim A: Společná aktivita (více účastníků v 1 čase, +-15 min) ---
+        for (let i = 0; i < allActivities.length; i++) {
+          for (let j = i + 1; j < allActivities.length; j++) {
+            const a1 = allActivities[i];
+            const a2 = allActivities[j];
 
-          if (a1.user !== a2.user && a1.records[0] && a2.records[0]) {
-            const timeDiff = Math.abs((a1.records[0].timestamp - a2.records[0].timestamp) / 1000);
-            const durationRatio = a1.elapsedSec / (a2.elapsedSec || 1);
+            if (a1.records[0] && a2.records[0]) {
+              const timeDiff = Math.abs((a1.records[0].timestamp - a2.records[0].timestamp) / 1000);
+              const durationRatio = a1.elapsedSec / (a2.elapsedSec || 1);
 
-            if (timeDiff <= 900 && durationRatio >= 0.7 && durationRatio <= 1.3) {
-              suggestedGroups.push({
-                type: 'scenario-a',
-                title: `⚡ Společná vyjížďka: ${a1.user} & ${a2.user}`,
-                subtext: `${a1.records[0].timestamp.toLocaleDateString()} @ ${a1.records[0].timestamp.toLocaleTimeString().slice(0,5)} (${a1.totalDistance.toFixed(1)} km)`,
-                indices: [i, j]
-              });
+              if (timeDiff <= 900 && durationRatio >= 0.6 && durationRatio <= 1.4) {
+                suggestedGroups.push({
+                  type: 'scenario-a',
+                  title: `⚡ Společná aktivita: ${a1.user} & ${a2.user}`,
+                  subtext: `${a1.records[0].timestamp.toLocaleDateString()} @ ${a1.records[0].timestamp.toLocaleTimeString().slice(0,5)} (${a1.totalDistance.toFixed(1)} km)`,
+                  indices: [i, j]
+                });
+              }
             }
           }
         }
-      }
+      } else {
+        // --- Režim B: Moje totožné aktivity v čase (3-stupňová filtrace) ---
+        const visited = new Array(allActivities.length).fill(false);
 
-      // 2. Scenario B: Route Clusters (same sport, matching distance +-10%, track similarity under toleranceMeters)
-      const visited = new Array(allActivities.length).fill(false);
+        for (let i = 0; i < allActivities.length; i++) {
+          if (visited[i]) continue;
+          const base = allActivities[i];
+          if (!base.records || base.records.length === 0) continue;
 
-      for (let i = 0; i < allActivities.length; i++) {
-        if (visited[i]) continue;
-        const base = allActivities[i];
-        if (!base.records || base.records.length === 0) continue;
+          const cluster = [i];
 
-        const cluster = [i];
+          for (let j = i + 1; j < allActivities.length; j++) {
+            if (visited[j]) continue;
+            const candidate = allActivities[j];
+            if (!candidate.records || candidate.records.length === 0) continue;
 
-        for (let j = i + 1; j < allActivities.length; j++) {
-          if (visited[j]) continue;
-          const candidate = allActivities[j];
-          if (!candidate.records || candidate.records.length === 0) continue;
+            // 1. Sport Type Filter
+            if (base.sportId !== candidate.sportId) continue;
 
-          // 1. Sport Type Filter
-          if (base.sportId !== candidate.sportId) continue;
+            // 2. Distance Tolerance Filter (% user-defined, default 5%)
+            const distDiffPct = (Math.abs(base.totalDistance - candidate.totalDistance) / Math.max(base.totalDistance, 1)) * 100;
+            if (distDiffPct > routeDistTolerancePct) continue;
 
-          // 2. Distance Tolerance Filter (% user-defined, default 5%)
-          const distDiffPct = (Math.abs(base.totalDistance - candidate.totalDistance) / Math.max(base.totalDistance, 1)) * 100;
-          if (distDiffPct > routeDistTolerancePct) continue;
+            // 3. Start & Finish Point Proximity Filter
+            const startDist = haversineDistance(base.records[0].lat, base.records[0].lng, candidate.records[0].lat, candidate.records[0].lng);
+            const endBase = base.records[base.records.length - 1];
+            const endCand = candidate.records[candidate.records.length - 1];
+            const endDist = haversineDistance(endBase.lat, endBase.lng, endCand.lat, endCand.lng);
 
-          // 3. Start & Finish Point Proximity Filter
-          const startDist = haversineDistance(base.records[0].lat, base.records[0].lng, candidate.records[0].lat, candidate.records[0].lng);
-          const endBase = base.records[base.records.length - 1];
-          const endCand = candidate.records[candidate.records.length - 1];
-          const endDist = haversineDistance(endBase.lat, endBase.lng, endCand.lat, endCand.lng);
+            if (startDist > routeGpsToleranceMeters * 3 || endDist > routeGpsToleranceMeters * 3) continue;
 
-          if (startDist > routeGpsToleranceMeters * 3 || endDist > routeGpsToleranceMeters * 3) continue;
+            // 4. Track Coverage Overlap Filter (user-defined %, default 90%)
+            const overlapRatio = calculateTrackOverlapRatio(base, candidate, routeGpsToleranceMeters);
+            if ((overlapRatio * 100) >= routeOverlapTolerancePct) {
+              cluster.push(j);
+              visited[j] = true;
+            }
+          }
 
-          // 4. Track Coverage Overlap Filter (user-defined %, default 90%)
-          const overlapRatio = calculateTrackOverlapRatio(base, candidate, routeGpsToleranceMeters);
-          if ((overlapRatio * 100) >= routeOverlapTolerancePct) {
-            cluster.push(j);
-            visited[j] = true;
+          if (cluster.length >= 2) {
+            visited[i] = true;
+            const avgDist = cluster.reduce((sum, idx) => sum + allActivities[idx].totalDistance, 0) / cluster.length;
+            routeClusters.push({
+              sportId: base.sportId,
+              sportName: base.sportName || 'Aktivita',
+              sportIcon: base.sportIcon || '⏱️',
+              avgDist: avgDist,
+              indices: cluster
+            });
           }
         }
-
-        if (cluster.length >= 2) {
-          visited[i] = true;
-          const avgDist = cluster.reduce((sum, idx) => sum + allActivities[idx].totalDistance, 0) / cluster.length;
-          routeClusters.push({
-            sportId: base.sportId,
-            sportName: base.sportName || 'Aktivita',
-            sportIcon: base.sportIcon || '⏱️',
-            avgDist: avgDist,
-            indices: cluster
-          });
-        }
       }
+    }
+
+    function selectAllInCluster(indices) {
+      selectedIndices = indices.slice(0, 5);
+      renderSidebar();
+      renderDashboard();
     }
 
     // --- Sidebar Rendering ---
@@ -2243,8 +2286,8 @@
 
       let hasContent = false;
 
-      // Render Scenario A (Joint Rides)
-      if (suggestedGroups.length > 0) {
+      // Render Scenario A (Joint Activities)
+      if (activeComparisonMode === 'joint' && suggestedGroups.length > 0) {
         hasContent = true;
         suggestedGroups.forEach(grp => {
           const item = document.createElement('div');
@@ -2256,7 +2299,7 @@
           };
 
           item.innerHTML = `
-            <span class="group-badge badge-scenario-a">Společná vyjížďka</span>
+            <span class="group-badge badge-scenario-a">Společná aktivita</span>
             <div class="group-name">${grp.title}</div>
             <div class="group-subtext">${grp.subtext}</div>
           `;
@@ -2264,72 +2307,74 @@
         });
       }
 
-      // Render Scenario B (Route Blocks)
-      if (routeClusters.length > 0) {
+      // Render Scenario B (Route Clusters)
+      if (activeComparisonMode === 'identical' && routeClusters.length > 0) {
         hasContent = true;
-        routeClusters.forEach((cluster, cIdx) => {
+        routeClusters.forEach(cluster => {
           const block = document.createElement('div');
-          block.className = 'route-block-card';
-          block.style.cssText = 'background: rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:0.6rem; margin-bottom:0.6rem;';
+          block.style.background = 'rgba(255, 255, 255, 0.02)';
+          block.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+          block.style.borderRadius = '8px';
+          block.style.padding = '0.6rem';
+          block.style.marginBottom = '0.6rem';
 
-          const header = document.createElement('div');
-          header.style.cssText = 'display:flex; justify-space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:0.4rem; margin-bottom:0.4rem; cursor:pointer;';
-          header.innerHTML = `
-            <div style="font-weight:700; font-size:0.85rem; color:#38bdf8; display:flex; align-items:center; gap:0.3rem;">
-              <span>${cluster.sportIcon}</span>
-              <span>${cluster.sportName} • ~${cluster.avgDist.toFixed(1)} km</span>
+          block.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; margin-bottom:0.4rem;" onclick="selectAllInCluster([${cluster.indices.join(',')}])">
+              <div style="font-weight:700; font-size:0.83rem; color:var(--accent-blue);">
+                ${cluster.sportIcon} ${cluster.sportName} &bull; ~${cluster.avgDist.toFixed(1)} km
+              </div>
+              <span style="font-size:0.72rem; padding:0.15rem 0.45rem; background:rgba(56,189,248,0.15); color:#38bdf8; border-radius:4px; font-weight:600;">
+                ${cluster.indices.length} aktivit
+              </span>
             </div>
-            <span style="font-size:0.75rem; background:rgba(56,189,248,0.15); color:#38bdf8; padding:2px 6px; border-radius:4px; font-weight:600;">
-              ${cluster.indices.length} aktivit
-            </span>
           `;
-          header.onclick = () => {
-            selectedIndices = cluster.indices.slice(0, 5);
-            renderSidebar();
-            renderDashboard();
-          };
-          block.appendChild(header);
 
           const itemsContainer = document.createElement('div');
-          itemsContainer.style.cssText = 'display:flex; flex-direction:column; gap:0.3rem;';
+          itemsContainer.style.display = 'flex';
+          itemsContainer.style.flexDirection = 'column';
+          itemsContainer.style.gap = '0.35rem';
 
           cluster.indices.forEach(actIdx => {
             const act = allActivities[actIdx];
             const isSel = selectedIndices.includes(actIdx);
-            const selOrder = selectedIndices.indexOf(actIdx);
-            const color = selOrder >= 0 ? TRACK_COLORS[selOrder % TRACK_COLORS.length] : 'transparent';
+            const color = TRACK_COLORS[selectedIndices.indexOf(actIdx)] || '#94a3b8';
 
             const item = document.createElement('div');
-            item.style.cssText = `display:flex; align-items:center; gap:0.4rem; padding:0.3rem 0.4rem; border-radius:4px; background:${isSel ? 'rgba(56,189,248,0.1)' : 'transparent'}; cursor:pointer;`;
+            item.style.display = 'flex';
+            item.style.alignItems = 'center';
+            item.style.gap = '0.5rem';
+            item.style.padding = '0.3rem 0.4rem';
+            item.style.borderRadius = '4px';
+            item.style.background = isSel ? 'rgba(56, 189, 248, 0.1)' : 'transparent';
+            item.style.cursor = 'pointer';
             item.onclick = (e) => {
-              if (e.target.tagName !== 'INPUT') toggleActivitySelection(actIdx);
+              e.stopPropagation();
+              toggleActivitySelection(actIdx);
             };
 
             const dateStr = act.records[0]?.timestamp ? act.records[0].timestamp.toLocaleDateString() : '';
             const timeStr = act.records[0]?.timestamp ? act.records[0].timestamp.toLocaleTimeString().slice(0,5) : '';
 
             item.innerHTML = `
-              <input type="checkbox" ${isSel ? 'checked' : ''} onchange="toggleActivitySelection(${actIdx})" style="accent-color:#38bdf8; cursor:pointer;">
-              <div style="width:8px; height:8px; border-radius:50%; background:${color}; border:${isSel ? 'none' : '1px solid var(--text-muted)'};"></div>
-              <div style="flex:1; min-width:0; font-size:0.78rem;">
-                <div style="font-weight:600; color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                  ${dateStr} @ ${timeStr} &bull; ${act.user} (${act.deviceName})
-                </div>
-                <div style="color:var(--text-muted); font-size:0.73rem;">
-                  ${act.totalDistance.toFixed(1)} km &bull; ${formatDuration(act.elapsedSec)} &bull; +${act.ascent}m
-                </div>
+              <input type="checkbox" ${isSel ? 'checked' : ''} style="accent-color:#38bdf8; cursor:pointer;">
+              <div style="width:8px; height:8px; border-radius:50%; background:${color};"></div>
+              <div style="flex:1; min-width:0; font-size:0.75rem;">
+                <div style="font-weight:600;">${dateStr} @ ${timeStr} &bull; ${act.user}</div>
               </div>
             `;
             itemsContainer.appendChild(item);
           });
-
           block.appendChild(itemsContainer);
           groupsContainer.appendChild(block);
         });
       }
 
       if (!hasContent) {
-        groupsContainer.innerHTML = `<div style="color:var(--text-muted); font-size:0.82rem; padding:0.4rem;">Žádné automatické páry nebo shodné okruhy nebyly při nastavené toleranci (délka: ${routeDistTolerancePct}%, GPS: ${routeGpsToleranceMeters}m, shoda: ${routeOverlapTolerancePct}%) nalezeny. Vyberte aktivity ručně ze seznamu níže.</div>`;
+        if (activeComparisonMode === 'joint') {
+          groupsContainer.innerHTML = `<div style="color:var(--text-muted); font-size:0.82rem; padding:0.4rem;">Nebyly nalezeny žádné dvě aktivity různých uživatelů se stejným časem startu (±15 min). Načtěte soubory od dalších účastníků nebo vyberte aktivity ručně níže.</div>`;
+        } else {
+          groupsContainer.innerHTML = `<div style="color:var(--text-muted); font-size:0.82rem; padding:0.4rem;">Žádné shodné okruhy nebyly při nastavené toleranci (délka: ${routeDistTolerancePct}%, GPS: ${routeGpsToleranceMeters}m, shoda: ${routeOverlapTolerancePct}%) nalezeny. Vyberte aktivity ručně ze seznamu níže.</div>`;
+        }
       }
 
       // Render Individual Activity Checklist below
