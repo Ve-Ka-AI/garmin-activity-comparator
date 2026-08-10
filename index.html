@@ -1854,7 +1854,7 @@
                   }
                 }
 
-                if (rec.lat && rec.lng) records.push(rec);
+                if (rec.timestamp) records.push(rec);
               }
             }
           }
@@ -2025,8 +2025,14 @@
 
       statusSpinner.style.display = 'none';
       statusCheck.style.display = 'flex';
-      statusText.innerText = `Úspěšně načteno a zpracováno ${allActivities.length} FIT aktivit v historii.`;
-      if (statusSubtext) statusSubtext.innerText = `Lícování tras a vytváření odkazů dokončeno.`;
+      
+      if (allActivities.length > 0) {
+        statusText.innerText = `Úspěšně načteno a zpracováno ${allActivities.length} FIT aktivit v historii.`;
+        if (statusSubtext) statusSubtext.innerText = `Lícování tras a vytváření odkazů dokončeno.`;
+      } else {
+        statusText.innerText = `⚠️ Z vybraných ${fileEntries.length} souborů se nepodařilo vytvořit žádné aktivity.`;
+        if (statusSubtext) statusSubtext.innerText = `Použijte prosím tlačítko "Vybrat .FIT soubory" pro přímý výběr jednotlivých .FIT souborů.`;
+      }
       if (statusPercent) statusPercent.innerText = `100 %`;
       if (progressBarFill) progressBarFill.style.width = `100%`;
 
@@ -2040,7 +2046,9 @@
         }
       }
 
-      document.getElementById('dashboardLayout').style.display = 'grid';
+      if (allActivities.length > 0) {
+        document.getElementById('dashboardLayout').style.display = 'grid';
+      }
       renderSidebar();
       renderDashboard();
     }
@@ -2092,6 +2100,7 @@
       const fileList = Array.from(e.target.files).filter(isCandidateFitFile);
       const entries = fileList.map(f => ({ file: f, path: f.webkitRelativePath || f.name }));
       await processFileListWithPaths(entries);
+      try { e.target.value = ''; } catch(err){}
     }
 
     // --- Airtight Global Drag & Drop Prevention (Prevents Chrome opening files in new tabs) ---
