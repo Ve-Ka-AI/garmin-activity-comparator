@@ -2235,17 +2235,17 @@
       routeClusters = [];
 
       if (activeComparisonMode === 'joint') {
-        // --- Režim A: Společná aktivita (více účastníků v 1 čase, +-15 min) ---
+        // --- Režim A: Společná aktivita (více účastníků v 1 čase, +-30 min) ---
         for (let i = 0; i < allActivities.length; i++) {
           for (let j = i + 1; j < allActivities.length; j++) {
             const a1 = allActivities[i];
             const a2 = allActivities[j];
 
-            if (a1.records[0] && a2.records[0]) {
+            if (a1.records && a1.records[0] && a2.records && a2.records[0]) {
               const timeDiff = Math.abs((a1.records[0].timestamp - a2.records[0].timestamp) / 1000);
               const durationRatio = a1.elapsedSec / (a2.elapsedSec || 1);
 
-              if (timeDiff <= 900 && durationRatio >= 0.6 && durationRatio <= 1.4) {
+              if (timeDiff <= 1800 && durationRatio >= 0.5 && durationRatio <= 1.5) {
                 suggestedGroups.push({
                   type: 'scenario-a',
                   title: `⚡ Společná aktivita: ${a1.user} & ${a2.user}`,
@@ -2255,6 +2255,16 @@
               }
             }
           }
+        }
+
+        // If no paired group was found by time, but 2+ activities are loaded, group them all for comparison!
+        if (suggestedGroups.length === 0 && allActivities.length >= 2) {
+          suggestedGroups.push({
+            type: 'scenario-a',
+            title: `⚡ Načtené aktivity ke srovnání (${allActivities.length} soubory)`,
+            subtext: `${allActivities[0].records[0]?.timestamp?.toLocaleDateString() || ''} (${allActivities.map(a => a.user).join(', ')})`,
+            indices: allActivities.slice(0, Math.min(5, allActivities.length)).map((_, idx) => idx)
+          });
         }
       } else {
         // --- Režim B: Moje totožné aktivity v čase (3-stupňová filtrace) ---
