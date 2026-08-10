@@ -1870,7 +1870,9 @@
                   rec.timestamp = lastRecordTimestamp;
                 }
 
-                if (rec.lat !== undefined || rec.lng !== undefined || rec.timestamp) records.push(rec);
+                if (rec.lat !== undefined && rec.lng !== undefined && !isNaN(rec.lat) && !isNaN(rec.lng)) {
+                  records.push(rec);
+                }
               }
             }
           }
@@ -1885,21 +1887,30 @@
 
         for (let i = 0; i < records.length; i++) {
           if (i === 0) {
-            if (records[i].dist === undefined) records[i].dist = 0;
+            if (records[i].dist === undefined || isNaN(records[i].dist)) records[i].dist = 0;
             records[i].elapsedSec = 0;
           } else {
             const prev = records[i - 1];
             const curr = records[i];
-            const stepDist = haversineDistance(prev.lat, prev.lng, curr.lat, curr.lng);
+
+            let stepDist = 0;
+            if (prev.lat !== undefined && prev.lng !== undefined && curr.lat !== undefined && curr.lng !== undefined) {
+              stepDist = haversineDistance(prev.lat, prev.lng, curr.lat, curr.lng);
+              if (isNaN(stepDist)) stepDist = 0;
+            }
             calcDist += stepDist;
-            if (curr.dist === undefined) curr.dist = calcDist;
+            if (curr.dist === undefined || isNaN(curr.dist)) curr.dist = calcDist;
 
-            const timeDelta = (curr.timestamp - prev.timestamp) / 1000;
-            curr.elapsedSec = prev.elapsedSec + (timeDelta > 0 ? timeDelta : 1);
+            let timeDelta = 1;
+            if (curr.timestamp && prev.timestamp) {
+              timeDelta = (curr.timestamp.getTime() - prev.timestamp.getTime()) / 1000.0;
+              if (isNaN(timeDelta) || timeDelta < 0) timeDelta = 1;
+            }
+            curr.elapsedSec = (prev.elapsedSec || 0) + timeDelta;
 
-            if ((curr.speed || 0) > 0.3) activeSec += (timeDelta > 0 ? timeDelta : 1);
+            if ((curr.speed || 0) > 0.3) activeSec += timeDelta;
 
-            if (curr.alt !== undefined && prev.alt !== undefined) {
+            if (curr.alt !== undefined && prev.alt !== undefined && !isNaN(curr.alt) && !isNaN(prev.alt)) {
               const diff = curr.alt - prev.alt;
               if (diff > 0 && diff < 10) asc += diff;
               else if (diff < 0 && Math.abs(diff) < 10) desc += Math.abs(diff);
