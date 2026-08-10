@@ -1636,6 +1636,19 @@
       return false;
     }
 
+    // --- Garmin Sport ID Mapping ---
+    function getSportInfo(sportId, subSportId, lang) {
+      const isCz = (lang === 'cz');
+      switch (sportId) {
+        case 1: return { sportId: 1, name: isCz ? 'Běh' : 'Running', icon: '🏃' };
+        case 2: return { sportId: 2, name: isCz ? 'Cyklistika' : 'Cycling', icon: '🚴' };
+        case 5: return { sportId: 5, name: isCz ? 'Plavání' : 'Swimming', icon: '🏊' };
+        case 11: return { sportId: 11, name: isCz ? 'Turistika' : 'Hiking', icon: '🥾' };
+        case 17: return { sportId: 17, name: isCz ? 'Kardio / Sauna' : 'Cardio / Sauna', icon: '🧘' };
+        default: return { sportId: sportId || 0, name: isCz ? 'Aktivita' : 'Activity', icon: '⏱️' };
+      }
+    }
+
     // --- Fast Native Binary FIT File Parser ---
     function parseFitNative(arrayBuffer, filePathName) {
       try {
