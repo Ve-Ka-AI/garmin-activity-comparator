@@ -1656,6 +1656,7 @@
         const deviceInfos = [];
         let sessionData = null;
         let fileId = {};
+        let lastRecordTimestamp = null;
 
         let idx = headerSize;
         while (idx < bodyEnd) {
@@ -1691,7 +1692,10 @@
               for (const fNum in msgData) {
                 const { raw, size } = msgData[fNum];
                 const dv = new DataView(raw.buffer, raw.byteOffset, size);
-                if (fNum == 253 && size === 4) rec.timestamp = new Date((dv.getUint32(0, isLittle) + 631065600) * 1000);
+                if (fNum == 253 && size === 4) {
+                  rec.timestamp = new Date((dv.getUint32(0, isLittle) + 631065600) * 1000);
+                  lastRecordTimestamp = rec.timestamp;
+                }
                 else if (fNum == 0 && size === 4) rec.lat = dv.getInt32(0, isLittle) * (180.0 / 2147483648.0);
                 else if (fNum == 1 && size === 4) rec.lng = dv.getInt32(0, isLittle) * (180.0 / 2147483648.0);
                 else if (fNum == 78 && size === 4) rec.alt = dv.getUint32(0, isLittle) / 5.0 - 500.0;
@@ -1720,7 +1724,12 @@
                 }
               }
 
-              if (rec.lat && rec.lng) records.push(rec);
+              if (!rec.timestamp && lastRecordTimestamp) {
+                rec.timestamp = new Date(lastRecordTimestamp.getTime() + 1000);
+                lastRecordTimestamp = rec.timestamp;
+              }
+
+              if (rec.lat !== undefined || rec.lng !== undefined || rec.timestamp) records.push(rec);
             }
           } else {
             const isDef = (hdr & 0x40) !== 0;
@@ -1825,7 +1834,10 @@
                 for (const fNum in msgData) {
                   const { raw, size } = msgData[fNum];
                   const dv = new DataView(raw.buffer, raw.byteOffset, size);
-                  if (fNum == 253 && size === 4) rec.timestamp = new Date((dv.getUint32(0, isLittle) + 631065600) * 1000);
+                  if (fNum == 253 && size === 4) {
+                    rec.timestamp = new Date((dv.getUint32(0, isLittle) + 631065600) * 1000);
+                    lastRecordTimestamp = rec.timestamp;
+                  }
                   else if (fNum == 0 && size === 4) rec.lat = dv.getInt32(0, isLittle) * (180.0 / 2147483648.0);
                   else if (fNum == 1 && size === 4) rec.lng = dv.getInt32(0, isLittle) * (180.0 / 2147483648.0);
                   else if (fNum == 78 && size === 4) rec.alt = dv.getUint32(0, isLittle) / 5.0 - 500.0;
@@ -1854,7 +1866,11 @@
                   }
                 }
 
-                if (rec.timestamp) records.push(rec);
+                if (!rec.timestamp && lastRecordTimestamp) {
+                  rec.timestamp = lastRecordTimestamp;
+                }
+
+                if (rec.lat !== undefined || rec.lng !== undefined || rec.timestamp) records.push(rec);
               }
             }
           }
