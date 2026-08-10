@@ -2015,25 +2015,31 @@
       await processFileListWithPaths(entries);
     }
 
-    window.addEventListener('dragover', (e) => e.preventDefault());
-    window.addEventListener('drop', (e) => e.preventDefault());
-
-    const dropzone = document.getElementById('dropzone');
-    dropzone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      dropzone.classList.add('dragover');
+    // --- Airtight Global Drag & Drop Prevention (Prevents Chrome opening files in new tabs) ---
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      window.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }, false);
+      document.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }, false);
+      document.body.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }, false);
     });
 
-    dropzone.addEventListener('dragleave', () => {
-      dropzone.classList.remove('dragover');
-    });
-
-    dropzone.addEventListener('drop', async (e) => {
+    const handleGlobalDrop = async (e) => {
       e.preventDefault();
-      dropzone.classList.remove('dragover');
+      e.stopPropagation();
+      
+      const dropzone = document.getElementById('dropzone');
+      if (dropzone) dropzone.classList.remove('dragover');
 
       const fileEntries = [];
-      const items = Array.from(e.dataTransfer.items || []);
+      const items = Array.from(e.dataTransfer?.items || []);
 
       for (const item of items) {
         if (item.kind === 'file') {
@@ -2049,7 +2055,7 @@
         }
       }
 
-      if (fileEntries.length === 0 && e.dataTransfer.files) {
+      if (fileEntries.length === 0 && e.dataTransfer?.files) {
         Array.from(e.dataTransfer.files).forEach(f => {
           if (isCandidateFitFile(f)) {
             fileEntries.push({ file: f, path: f.name });
@@ -2060,7 +2066,24 @@
       if (fileEntries.length > 0) {
         await processFileListWithPaths(fileEntries);
       }
-    });
+    };
+
+    window.addEventListener('drop', handleGlobalDrop);
+
+    const dropzone = document.getElementById('dropzone');
+    if (dropzone) {
+      dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add('dragover');
+      });
+
+      dropzone.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove('dragover');
+      });
+    }
 
     async function readEntryRecursive(entry, fileEntries, currentPath) {
       if (entry.isFile) {
