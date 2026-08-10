@@ -1623,6 +1623,9 @@
         }
         if (minD <= toleranceM) matchCount++;
       }
+      return totalSampled > 0 ? (matchCount / totalSampled) : 0;
+    }
+
     function isCandidateFitFile(f) {
       if (!f) return false;
       const name = (f.name || '').toLowerCase();
@@ -2025,7 +2028,11 @@
       computeMatchingGroups();
 
       if (selectedIndices.length === 0 && allActivities.length > 0) {
-        selectedIndices = allActivities.slice(0, Math.min(3, allActivities.length)).map((_, idx) => idx);
+        if (suggestedGroups.length > 0) {
+          selectedIndices = [...suggestedGroups[0].indices];
+        } else {
+          selectedIndices = allActivities.slice(0, Math.min(5, allActivities.length)).map((_, idx) => idx);
+        }
       }
 
       document.getElementById('dashboardLayout').style.display = 'grid';
