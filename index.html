@@ -1754,7 +1754,7 @@
               defs[localMsgType] = { gNum, isLittle, fields, devFields };
             } else {
               const def = defs[localMsgType];
-              if (!def) break;
+              if (!def) continue;
               const isLittle = def.isLittle;
               const msgData = {};
               for (const field of def.fields) {
@@ -1922,12 +1922,17 @@
         const hasGritData = records.some(r => r.grit !== undefined && r.grit > 0);
         const hasFlowData = records.some(r => r.flow !== undefined && r.flow > 0);
 
+        const cleanName = filePathName.split(/[/\\]/).pop().replace(/\.fit$/i, '');
+        const pathParts = filePathName.split(/[/\\]/);
+        const devName = getDeviceName(fileId.product, fileId.manufacturer);
+        const userTag = (pathParts.length > 1 && pathParts[0] !== cleanName) ? pathParts[0] : (devName || 'Uživatel');
+
         return {
           filename: cleanName + '.fit',
           user: userTag,
           productID: fileId.product,
           manufacturerID: fileId.manufacturer,
-          deviceName: getDeviceName(fileId.product, fileId.manufacturer),
+          deviceName: devName,
           swVersion: deviceInfos[0]?.softwareVersion || 'N/A',
           records: records,
           sportId: sportInfo.sportId,
