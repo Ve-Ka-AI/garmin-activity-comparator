@@ -2055,7 +2055,15 @@
           const buffer = await file.arrayBuffer();
           const parsed = parseFitNative(buffer, pathName);
           if (parsed && parsed.records && parsed.records.length > 0) {
-            const isDup = allActivities.some(a => a.filename === parsed.filename && a.records[0]?.timestamp?.getTime() === parsed.records[0]?.timestamp?.getTime());
+            const parsedTs = (parsed.records[0] && parsed.records[0].timestamp && typeof parsed.records[0].timestamp.getTime === 'function') ? parsed.records[0].timestamp.getTime() : null;
+            const isDup = allActivities.some(a => {
+              const aTs = (a.records[0] && a.records[0].timestamp && typeof a.records[0].timestamp.getTime === 'function') ? a.records[0].timestamp.getTime() : null;
+              if (a.filename === parsed.filename) {
+                if (parsedTs !== null && aTs !== null) return aTs === parsedTs;
+                return true;
+              }
+              return false;
+            });
             if (!isDup) {
               allActivities.push(parsed);
               loadedCount++;
@@ -2229,8 +2237,16 @@
         }
       } else if (entry.isDirectory) {
         const dirReader = entry.createReader();
-        const entries = await new Promise(resolve => dirReader.readEntries(resolve));
         const dirPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+        let entries = [];
+        let batch;
+        do {
+          batch = await new Promise(resolve => dirReader.readEntries(resolve));
+          if (batch && batch.length > 0) {
+            entries = entries.concat(batch);
+          }
+        } while (batch && batch.length > 0);
+
         for (const subEntry of entries) {
           await readEntryRecursive(subEntry, fileEntries, dirPath);
         }
