@@ -1587,7 +1587,14 @@
         }
         if (minD <= toleranceM) matchCount++;
       }
-      return totalSampled > 0 ? (matchCount / totalSampled) : 0;
+    function isCandidateFitFile(f) {
+      if (!f) return false;
+      const name = (f.name || '').toLowerCase();
+      if (name.endsWith('.fit')) return true;
+      if (!name.includes('.') || name.match(/^\d{4}-\d{2}-\d{2}/) || f.type === 'application/octet-stream' || f.type === '') {
+        return true;
+      }
+      return false;
     }
 
     // --- Fast Native Binary FIT File Parser ---
@@ -1595,6 +1602,10 @@
       try {
         const data = new Uint8Array(arrayBuffer);
         if (data.length < 14) return null;
+
+        // Verify FIT header magic bytes '.FIT' at offset 8..11
+        const isFitMagic = (data[8] === 46 && data[9] === 70 && data[10] === 73 && data[11] === 84);
+        if (!isFitMagic && !filePathName.toLowerCase().endsWith('.fit')) return null;
         const headerSize = data[0];
         const view = new DataView(arrayBuffer);
         const dataSize = view.getUint32(4, true);
@@ -1971,7 +1982,7 @@
 
     async function handleFileSelect(e) {
       if (!e.target.files || e.target.files.length === 0) return;
-      const fileList = Array.from(e.target.files).filter(f => f.name.toLowerCase().endsWith('.fit'));
+      const fileList = Array.from(e.target.files).filter(isCandidateFitFile);
       const entries = fileList.map(f => ({ file: f, path: f.webkitRelativePath || f.name }));
       await processFileListWithPaths(entries);
     }
@@ -2003,7 +2014,7 @@
             await readEntryRecursive(entry, fileEntries, '');
           } else {
             const f = item.getAsFile();
-            if (f && f.name.toLowerCase().endsWith('.fit')) {
+            if (f && isCandidateFitFile(f)) {
               fileEntries.push({ file: f, path: f.name });
             }
           }
@@ -2012,7 +2023,7 @@
 
       if (fileEntries.length === 0 && e.dataTransfer.files) {
         Array.from(e.dataTransfer.files).forEach(f => {
-          if (f.name.toLowerCase().endsWith('.fit')) {
+          if (isCandidateFitFile(f)) {
             fileEntries.push({ file: f, path: f.name });
           }
         });
@@ -2025,10 +2036,14 @@
 
     async function readEntryRecursive(entry, fileEntries, currentPath) {
       if (entry.isFile) {
-        if (entry.name.toLowerCase().endsWith('.fit')) {
-          const file = await new Promise(resolve => entry.file(resolve));
-          const fullPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
-          fileEntries.push({ file: file, path: fullPath });
+        try {
+          const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+          if (file && isCandidateFitFile(file)) {
+            const fullPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
+            fileEntries.push({ file: file, path: fullPath });
+          }
+        } catch (err) {
+          console.error("Error reading file entry:", entry.name, err);
         }
       } else if (entry.isDirectory) {
         const dirReader = entry.createReader();
