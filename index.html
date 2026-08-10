@@ -1918,8 +1918,10 @@
             if (curr.dist === undefined || isNaN(curr.dist)) curr.dist = calcDist;
 
             let timeDelta = 1;
-            if (curr.timestamp && prev.timestamp) {
-              timeDelta = (curr.timestamp.getTime() - prev.timestamp.getTime()) / 1000.0;
+            const tCurr = (curr.timestamp && typeof curr.timestamp.getTime === 'function') ? curr.timestamp.getTime() : null;
+            const tPrev = (prev.timestamp && typeof prev.timestamp.getTime === 'function') ? prev.timestamp.getTime() : null;
+            if (tCurr !== null && tPrev !== null) {
+              timeDelta = (tCurr - tPrev) / 1000.0;
               if (isNaN(timeDelta) || timeDelta < 0) timeDelta = 1;
             }
             curr.elapsedSec = (prev.elapsedSec || 0) + timeDelta;
@@ -1947,8 +1949,12 @@
         // Frequency & Smart Recording
         const deltas = [];
         for (let i = 1; i < records.length; i++) {
-          const d = (records[i].timestamp - records[i - 1].timestamp) / 1000;
-          if (d > 0 && d < 300) deltas.push(d);
+          const t1 = (records[i].timestamp && typeof records[i].timestamp.getTime === 'function') ? records[i].timestamp.getTime() : null;
+          const t0 = (records[i - 1].timestamp && typeof records[i - 1].timestamp.getTime === 'function') ? records[i - 1].timestamp.getTime() : null;
+          if (t1 !== null && t0 !== null) {
+            const d = (t1 - t0) / 1000.0;
+            if (d > 0 && d < 300) deltas.push(d);
+          }
         }
         const avgInterval = deltas.length > 0 ? (deltas.reduce((a, b) => a + b, 0) / deltas.length) : 1;
         const onesCount = deltas.filter(d => Math.abs(d - 1) < 0.2).length;
@@ -2053,6 +2059,10 @@
 
         try {
           const buffer = await file.arrayBuffer();
+          if (!buffer || buffer.byteLength === 0) {
+            if (statusSubtext) statusSubtext.innerText = `Chyba: Soubor ${fileName} je prázdný (0 B). Zkontrolujte prosím lokální stažení.`;
+            continue;
+          }
           const parsed = parseFitNative(buffer, pathName);
           if (parsed && parsed.records && parsed.records.length > 0) {
             const parsedTs = (parsed.records[0] && parsed.records[0].timestamp && typeof parsed.records[0].timestamp.getTime === 'function') ? parsed.records[0].timestamp.getTime() : null;
@@ -2068,9 +2078,12 @@
               allActivities.push(parsed);
               loadedCount++;
             }
+          } else {
+            console.warn("parseFitNative returned null or 0 records for:", fileName);
           }
         } catch (err) {
           console.error("Error processing file:", fileName, err);
+          if (statusSubtext) statusSubtext.innerText = `Detail chyby u ${fileName}: ${err.message}`;
         }
       }
 
