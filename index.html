@@ -869,9 +869,21 @@
         </div>
       </div>
 
-      <div class="toggle-group" style="margin-left: auto;">
-        <span class="toggle-label" id="lblTolerance">Tolerance shody tras: <strong id="valTolerance" style="color:var(--accent-blue);">10 m</strong></span>
-        <input type="range" id="sliderTolerance" min="5" max="100" value="10" step="1" oninput="onToleranceChange(this.value)" title="GPS tolerance pro geografické lícování a shodu tras" style="accent-color: #38bdf8; cursor: pointer; vertical-align: middle; width: 110px;">
+      <div class="toggle-group" style="margin-left: auto; display:flex; gap:0.9rem; align-items:center; background:rgba(255,255,255,0.03); padding:0.3rem 0.7rem; border-radius:6px; border:1px solid rgba(255,255,255,0.06);">
+        <div style="display:flex; align-items:center; gap:0.4rem;">
+          <span class="toggle-label" title="Tolerovaný rozdíl celkové délky v %">Toler. délky: <strong id="valDistTolerance" style="color:var(--accent-blue);">5 %</strong></span>
+          <input type="range" id="sliderDistTolerance" min="0" max="15" value="5" step="1" oninput="onDistToleranceChange(this.value)" title="Tolerovaný rozdíl celkové délky v % (0-15%)" style="accent-color: #38bdf8; cursor: pointer; vertical-align: middle; width: 70px;">
+        </div>
+
+        <div style="display:flex; align-items:center; gap:0.4rem;">
+          <span class="toggle-label" title="GPS odchylka trasových bodů v metrech">Toler. GPS: <strong id="valGpsTolerance" style="color:var(--accent-blue);">10 m</strong></span>
+          <input type="range" id="sliderGpsTolerance" min="5" max="100" value="10" step="1" oninput="onGpsToleranceChange(this.value)" title="GPS odchylka v metrech (5-100m)" style="accent-color: #38bdf8; cursor: pointer; vertical-align: middle; width: 70px;">
+        </div>
+
+        <div style="display:flex; align-items:center; gap:0.4rem;">
+          <span class="toggle-label" title="Minimální % trasových bodů v GPS toleranci">Shoda tvaru: <strong id="valOverlapTolerance" style="color:var(--accent-blue);">90 %</strong></span>
+          <input type="range" id="sliderOverlapTolerance" min="50" max="100" value="90" step="5" oninput="onOverlapToleranceChange(this.value)" title="Minimální % shodných bodů (50-100%)" style="accent-color: #38bdf8; cursor: pointer; vertical-align: middle; width: 70px;">
+        </div>
       </div>
 
       <div class="toggle-group">
@@ -1503,7 +1515,6 @@
     // --- Temperature Moving Average Smoothing Filter ---
     function smoothTemperatureSeries(series) {
       if (!series || series.length === 0) return [];
-      // Dynamic window size: 2.5% of total points (min 120 points, ~2 minutes)
       const windowSize = Math.max(120, Math.floor(series.length * 0.025));
       const half = Math.floor(windowSize / 2);
       const result = [];
@@ -1514,6 +1525,60 @@
           if (series[j].y !== null && series[j].y !== undefined) {
             sum += series[j].y;
             count++;
+          }
+        }
+        result.push({ x: series[i].x, y: count > 0 ? (sum / count) : series[i].y });
+      }
+      return result;
+    }
+
+    let routeDistTolerancePct = 5;
+    let routeGpsToleranceMeters = 10;
+    let routeOverlapTolerancePct = 90;
+    let routeClusters = [];
+
+    function onDistToleranceChange(val) {
+      routeDistTolerancePct = parseInt(val, 10);
+      document.getElementById('valDistTolerance').innerText = routeDistTolerancePct + ' %';
+      computeMatchingGroups();
+      renderSidebar();
+      if (selectedIndices.length > 0) renderDashboard();
+    }
+
+    function onGpsToleranceChange(val) {
+      routeGpsToleranceMeters = parseInt(val, 10);
+      document.getElementById('valGpsTolerance').innerText = routeGpsToleranceMeters + ' m';
+      computeMatchingGroups();
+      renderSidebar();
+      if (selectedIndices.length > 0) renderDashboard();
+    }
+
+    function onOverlapToleranceChange(val) {
+      routeOverlapTolerancePct = parseInt(val, 10);
+      document.getElementById('valOverlapTolerance').innerText = routeOverlapTolerancePct + ' %';
+      computeMatchingGroups();
+      renderSidebar();
+      if (selectedIndices.length > 0) renderDashboard();
+    }
+
+    function calculateTrackOverlapRatio(actA, actB, toleranceM) {
+      if (!actA.records || !actB.records || actA.records.length === 0 || actB.records.length === 0) return 0;
+      const rA = actA.records;
+      const rB = actB.records;
+      const sampleCount = Math.min(40, rA.length);
+      const step = Math.max(1, Math.floor(rA.length / sampleCount));
+      let matchCount = 0;
+      let totalSampled = 0;
+
+      for (let i = 0; i < rA.length; i += step) {
+        const ptA = rA[i];
+        totalSampled++;
+        let minD = Infinity;
+        for (let j = 0; j < rB.length; j += 8) {
+          const d = haversineDistance(ptA.lat, ptA.lng, rB[j].lat, rB[j].lng);
+          if (d < minD) {
+            minD = d;
+            if (d <= toleranceM) break;
           }
         }
         if (minD <= toleranceM) matchCount++;
@@ -2013,24 +2078,24 @@
           const candidate = allActivities[j];
           if (!candidate.records || candidate.records.length === 0) continue;
 
-          // Sport Type Filter
+          // 1. Sport Type Filter
           if (base.sportId !== candidate.sportId) continue;
 
-          // Distance Ratio Filter (+-10%)
-          const distDiffRatio = Math.abs(base.totalDistance - candidate.totalDistance) / Math.max(base.totalDistance, 1);
-          if (distDiffRatio > 0.10) continue;
+          // 2. Distance Tolerance Filter (% user-defined, default 5%)
+          const distDiffPct = (Math.abs(base.totalDistance - candidate.totalDistance) / Math.max(base.totalDistance, 1)) * 100;
+          if (distDiffPct > routeDistTolerancePct) continue;
 
-          // Start & Finish Point Proximity Filter
+          // 3. Start & Finish Point Proximity Filter
           const startDist = haversineDistance(base.records[0].lat, base.records[0].lng, candidate.records[0].lat, candidate.records[0].lng);
           const endBase = base.records[base.records.length - 1];
           const endCand = candidate.records[candidate.records.length - 1];
           const endDist = haversineDistance(endBase.lat, endBase.lng, endCand.lat, endCand.lng);
 
-          if (startDist > routeToleranceMeters * 3 || endDist > routeToleranceMeters * 3) continue;
+          if (startDist > routeGpsToleranceMeters * 3 || endDist > routeGpsToleranceMeters * 3) continue;
 
-          // Track Coverage Overlap Filter (>= 75% points within toleranceMeters)
-          const overlapRatio = calculateTrackOverlapRatio(base, candidate, routeToleranceMeters);
-          if (overlapRatio >= 0.75) {
+          // 4. Track Coverage Overlap Filter (user-defined %, default 90%)
+          const overlapRatio = calculateTrackOverlapRatio(base, candidate, routeGpsToleranceMeters);
+          if ((overlapRatio * 100) >= routeOverlapTolerancePct) {
             cluster.push(j);
             visited[j] = true;
           }
@@ -2143,7 +2208,7 @@
       }
 
       if (!hasContent) {
-        groupsContainer.innerHTML = `<div style="color:var(--text-muted); font-size:0.82rem; padding:0.4rem;">Žádné automatické páry nebyly při toleranci ${routeToleranceMeters} m nalezeny. Vyberte aktivity ručně ze seznamu níže.</div>`;
+        groupsContainer.innerHTML = `<div style="color:var(--text-muted); font-size:0.82rem; padding:0.4rem;">Žádné automatické páry nebo shodné okruhy nebyly při nastavené toleranci (délka: ${routeDistTolerancePct}%, GPS: ${routeGpsToleranceMeters}m, shoda: ${routeOverlapTolerancePct}%) nalezeny. Vyberte aktivity ručně ze seznamu níže.</div>`;
       }
 
       // Render Individual Activity Checklist below
